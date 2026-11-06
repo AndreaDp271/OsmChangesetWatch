@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -104,13 +105,13 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
             }
             Text(stringResource(R.string.map_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(16.dp, 4.dp))
             AndroidView(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds(), // MapView non clippa da solo e copriva il testo sopra
                 factory = {
                     map.apply {
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-                        controller.setZoom(11.0)
+                        controller.setZoom(13.0)
                         controller.setCenter(GeoPoint(area?.let { (it.minLat + it.maxLat) / 2 } ?: 41.9, area?.let { (it.minLon + it.maxLon) / 2 } ?: 12.5))
                         val dens = resources.displayMetrics.density
                         post {

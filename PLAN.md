@@ -4,7 +4,7 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
 
 ## Stato
 - [x] Fase 1 — scheletro e rete (completata, vedi sotto)
-- [~] Fase 2 — codice pronto e compila; manca il test su telefono (creo/modifico/disabilito/elimino, riavvio)
+- [x] Fase 2 — verificata su telefono (CPH2363): crea/modifica/disabilita/elimina, dati persistenti al riavvio
 - [ ] Fasi 3-6
 
 ## Decisioni
