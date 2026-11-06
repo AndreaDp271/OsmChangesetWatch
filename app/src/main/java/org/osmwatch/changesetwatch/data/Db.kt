@@ -82,7 +82,7 @@ interface AreaDao {
 @Dao
 interface ChangesetDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE) // dedup su (id, areaId): non sovrascrive "seen"
-    suspend fun insertAll(rows: List<ChangesetRow>)
+    suspend fun insertAll(rows: List<ChangesetRow>): List<Long> // -1 = già presente
 
     @Query("SELECT * FROM changeset WHERE (:areaId IS NULL OR areaId = :areaId) AND (:includeSeen OR seen = 0) ORDER BY createdAt DESC")
     fun observe(areaId: Long?, includeSeen: Boolean): Flow<List<ChangesetRow>>

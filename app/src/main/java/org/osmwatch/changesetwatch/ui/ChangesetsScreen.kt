@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -48,6 +49,7 @@ fun ChangesetsScreen(
     onRefresh: () -> Unit,
     onOpen: (ChangesetRow) -> Unit,
     onAreas: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val names = areas.associate { it.id to it.name }
     Scaffold(
@@ -57,6 +59,7 @@ fun ChangesetsScreen(
                 actions = {
                     IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
                     IconButton(onClick = onAreas) { Icon(Icons.Default.Place, stringResource(R.string.areas)) }
+                    IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, stringResource(R.string.settings)) }
                 },
             )
         },

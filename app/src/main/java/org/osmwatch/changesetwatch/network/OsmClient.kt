@@ -22,17 +22,18 @@ class OsmClient(
 ) {
 
     /**
-     * Changeset creati in [from, to) la cui bbox interseca [bbox], dal più recente. Max 100 (limite API).
-     * `from`/`to` filtrano per data di creazione (non `time`, che filtra per chiusura).
+     * Changeset la cui bbox interseca [bbox], dal più recente per creazione. Max 100 (limite API).
+     * `closedAfter` = `time=T1`: chiusi dopo T1 O ancora aperti (cattura anche i changeset lunghi).
+     * `createdBefore` = `time=T1,T2` (T2 usato per la paginazione); ignorato senza `closedAfter`.
      */
-    fun fetchChangesets(bbox: BBox, from: Instant? = null, to: Instant? = null, limit: Int = 100): List<Changeset> {
+    fun fetchChangesets(bbox: BBox, closedAfter: Instant? = null, createdBefore: Instant? = null, limit: Int = 100): List<Changeset> {
         val url = "$baseUrl/changesets".toHttpUrl().newBuilder()
             .addQueryParameter("bbox", bbox.toApiParam())
             .addQueryParameter("limit", limit.toString())
             .apply {
-                // `to` senza `from` viene ignorato dall'API
-                if (from != null) addQueryParameter("from", from.toString())
-                if (from != null && to != null) addQueryParameter("to", to.toString())
+                if (closedAfter != null) {
+                    addQueryParameter("time", if (createdBefore != null) "$closedAfter,$createdBefore" else closedAfter.toString())
+                }
             }
             .build()
         return execute(url) { ChangesetParser.parse(it.body!!.byteStream()) }

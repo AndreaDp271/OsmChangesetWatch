@@ -43,9 +43,11 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
+    implementation(libs.compose.icons.extended) // stesse icone di ParkMap; R8 in release elimina quelle non usate
     implementation(libs.androidx.activity.compose)
     implementation(libs.okhttp)
     implementation(libs.osmdroid)
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

@@ -15,6 +15,8 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
 - User-Agent in `OsmConfig.USER_AGENT` (URL contatto da sostituire: CHANGEME).
 - Test JVM del parser usano kxml2+xmlpull solo come testImplementation.
 - Refresh manuale: ultimi 100 changeset per area SENZA `from` (anche precedenti alla creazione area, richiesta autore). `from`+paginazione solo in fase 4.
+- Stile condiviso con ParkMap (repo AndreaDp271/Park_finder-APK): Theme.kt (stessa palette blu), Common.kt (Bar/Group/Item/Choice), settings con tema/palette/lingua. Icone material-icons-extended (R8 in release in fase 6). Updater GitHub NON portato (F-Droid).
+- Background: `time=T1[,T2]` (chiusi dopo T1 o aperti) + paginazione T2=created_at più vecchio+1s, max 5 pagine; primo giro = seed senza notifica; notifica 1 per area (id = areaId).
 - Mappa: osmdroid 6.1.20 (scelta confermata dall autore). Room 2.6.1 + KSP.
 - applicationId provvisorio `org.osmwatch.changesetwatch`; licenza e soglie filtro: domande aperte.
 

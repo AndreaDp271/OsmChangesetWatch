@@ -25,12 +25,12 @@ class OsmClientTest {
 
     @Test fun request_hasUserAgentAndParams() {
         server.enqueue(MockResponse().setBody(empty))
-        client().fetchChangesets(BBox(41.0, 12.0, 42.0, 13.0), from = Instant.parse("2026-01-01T00:00:00Z"))
+        client().fetchChangesets(BBox(41.0, 12.0, 42.0, 13.0), closedAfter = Instant.parse("2026-01-01T00:00:00Z"), createdBefore = Instant.parse("2026-02-01T00:00:00Z"))
         val r = server.takeRequest()
         assertEquals(OsmConfig.USER_AGENT, r.getHeader("User-Agent"))
         val u = r.requestUrl!!
         assertEquals("12.0,41.0,13.0,42.0", u.queryParameter("bbox")) // W,S,E,N
-        assertEquals("2026-01-01T00:00:00Z", u.queryParameter("from"))
+        assertEquals("2026-01-01T00:00:00Z,2026-02-01T00:00:00Z", u.queryParameter("time"))
         assertEquals("100", u.queryParameter("limit"))
     }
 

@@ -3,7 +3,6 @@ package org.osmwatch.changesetwatch.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -16,18 +15,15 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.osmwatch.changesetwatch.data.AppDatabase
 import org.osmwatch.changesetwatch.data.ChangesetRow
-import org.osmwatch.changesetwatch.data.Verdict
 import org.osmwatch.changesetwatch.data.WatchArea
-import org.osmwatch.changesetwatch.data.toRow
-import org.osmwatch.changesetwatch.network.OsmClient
+import org.osmwatch.changesetwatch.data.ChangesetRepository
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
-    private val client = OsmClient()
+    private val repo = ChangesetRepository(db)
 
     val areaFilter = MutableStateFlow<Long?>(null)
     val includeSeen = MutableStateFlow(true)
@@ -63,11 +59,7 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
                 enabled.forEachIndexed { i, area ->
                     if (i > 0) delay(1_000)
                     try {
-                        val now = System.currentTimeMillis()
-                        val rows = withContext(Dispatchers.IO) { client.fetchChangesets(area.bbox) }
-                            .map { it.toRow(area.id, Verdict.UNCERTAIN, now) }
-                        db.changesetDao().insertAll(rows)
-                        db.areaDao().setLastChecked(area.id, now)
+                        repo.refreshLatest(area)
                     } catch (e: Exception) {
                         failures += "${area.name}: ${e.message ?: e.javaClass.simpleName}"
                     }
