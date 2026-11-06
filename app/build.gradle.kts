@@ -13,13 +13,24 @@ android {
         applicationId = "io.github.andreadp271.osmwatch"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 100
+        versionName = "1.0.0"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // firma solo se le variabili d'ambiente sono presenti (mai segreti nel repo); F-Droid firma con la propria chiave
+            System.getenv("OSMWATCH_KEYSTORE")?.let { ks ->
+                signingConfig = signingConfigs.create("release") {
+                    storeFile = file(ks)
+                    storePassword = System.getenv("OSMWATCH_KEYSTORE_PASSWORD")
+                    keyAlias = System.getenv("OSMWATCH_KEY_ALIAS")
+                    keyPassword = System.getenv("OSMWATCH_KEY_PASSWORD")
+                }
+            }
         }
     }
     compileOptions {

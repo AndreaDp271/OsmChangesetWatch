@@ -1,0 +1,1 @@
+Prima versione: aree su mappa, filtro vero dei changeset dentro l'area, minimappa dei cambiamenti con dettaglio dei tag, notifiche raggruppate in background.

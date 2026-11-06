@@ -3,8 +3,9 @@ package org.osmwatch.changesetwatch.network
 object OsmConfig {
     const val BASE_URL = "https://api.openstreetmap.org/api/0.6"
 
-    /** Obbligatorio per policy OSM: identifica l'app e un contatto. TODO: sostituire l'URL col repo reale. */
-    const val USER_AGENT = "OSMChangesetWatch/0.1.0 (https://github.com/CHANGEME/osm-changeset-watch)"
+    /** Obbligatorio per policy OSM: identifica l'app e un contatto. Tenere la versione allineata a versionName. */
+    const val REPO = "https://github.com/AndreaDp271/OsmChangesetWatch"
+    const val USER_AGENT = "OSMChangesetWatch/1.0.0 ($REPO)"
 
     const val CONNECT_TIMEOUT_S = 15L
     const val READ_TIMEOUT_S = 30L

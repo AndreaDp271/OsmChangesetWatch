@@ -1,0 +1,1 @@
+First release: areas on a map, real filtering of changesets inside the area, mini map of the changes with tag details, grouped background notifications.

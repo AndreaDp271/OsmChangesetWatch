@@ -19,7 +19,6 @@
     <string name="no_areas_home">Add an area first (map icon, top right).</string>
     <string name="no_changesets">No changesets yet. Pull down to refresh.</string>
     <string name="no_comment">(no comment)</string>
-    <string name="changes_n">%1$d changes</string>
     <string name="f_user">User</string>
     <string name="f_area">Area</string>
     <string name="f_created">Created</string>
@@ -93,4 +92,10 @@
     <string name="diff_none">No tag or geometry changes.</string>
     <string name="diff_moved">Moved by %1$d m</string>
     <string name="diff_nodes">Nodes: +%1$d / −%2$d</string>
+    <plurals name="changes_n">
+        <item quantity="one">%d change</item>
+        <item quantity="other">%d changes</item>
+    </plurals>
+    <string name="source_code">Source code</string>
+    <string name="report_issue">Report a problem</string>
 </resources>

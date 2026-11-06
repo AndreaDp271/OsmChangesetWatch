@@ -63,7 +63,7 @@ class PollWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val n = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_map)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(areaName)
             .setContentText(applicationContext.resources.getQuantityString(R.plurals.new_changesets, count, count))
             .setContentIntent(open)

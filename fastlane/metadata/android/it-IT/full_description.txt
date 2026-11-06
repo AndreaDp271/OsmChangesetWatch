@@ -1,0 +1,12 @@
+OSM Changeset Watch controlla OpenStreetMap e ti avvisa quando compaiono nuovi changeset in una o più aree che disegni sulla mappa.
+
+• Disegna le aree sulla mappa: sposta e ridimensiona un rettangolo e vedi la superficie in km².
+• Filtro vero: OpenStreetMap restituisce ogni changeset la cui bounding box interseca la tua area, anche se non la tocca davvero. L'app scarica ogni candidato e mostra solo quelli che toccano davvero la tua area: i changeset enormi che la attraversano soltanto restano nascosti.
+• Vedi i cambiamenti: una minimappa mostra cosa è stato aggiunto (verde), modificato (arancione) o eliminato (rosso, tratteggiato). Tocca un elemento per vedere esattamente quali tag sono cambiati.
+• Notifiche: una notifica raggruppata per area, con controlli in background all'intervallo che scegli (da 15 minuti a 6 ore).
+• Apri ogni changeset su osm.org, Achavi o OSMCha per la revisione completa.
+• Nessun account, nessuna pubblicità, nessun tracciamento, nessun servizio Google. Accesso in sola lettura all'API pubblica di OpenStreetMap.
+
+Limiti: i controlli in background sono approssimativi (il risparmio energetico può ritardarli); le relation non sono disegnate sulla mappa; i changeset oltre la dimensione impostata non vengono scaricati.
+
+Dati © OpenStreetMap contributors (ODbL).

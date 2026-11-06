@@ -18,6 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.FilterAlt
@@ -55,6 +57,7 @@ import java.io.File
 import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.AppSettings
 import org.osmwatch.changesetwatch.data.Prefs
+import org.osmwatch.changesetwatch.network.OsmConfig
 import org.osmwatch.changesetwatch.work.PollWorker
 
 private object SetColors { // stessi colori di gruppo di ParkMap
@@ -158,7 +161,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             Group(stringResource(R.string.group_info)) {
-                // TODO: aggiungere "Codice sorgente" / "Segnala un problema" quando esiste il repository pubblico
+                Item(Icons.Filled.Code, SetColors.about, stringResource(R.string.source_code), OsmConfig.REPO.removePrefix("https://"), onClick = { openUrl(ctx, OsmConfig.REPO) })
+                Divider()
+                Item(Icons.Filled.BugReport, SetColors.about, stringResource(R.string.report_issue), onClick = { openUrl(ctx, OsmConfig.REPO + "/issues/new") })
+                Divider()
                 Item(Icons.Filled.Map, SetColors.about, stringResource(R.string.osm_copyright), onClick = { openUrl(ctx, "https://www.openstreetmap.org/copyright") })
             }
             Muted(stringResource(R.string.data_note), Modifier.padding(horizontal = 8.dp, vertical = 12.dp))
@@ -181,9 +187,8 @@ fun SettingsScreen(onBack: () -> Unit) {
 private fun AppCard(version: String) {
     Box(Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(listOf(Color(0xFF1D4ED8), Color(0xFF3B82F6))))) {
         Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            // TODO fase 6: icona vera dell'app al posto di questo segnaposto
-            Box(Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)).background(Color.White.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Place, null, tint = Color.White, modifier = Modifier.size(36.dp))
+            Box(Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFF2563EB)), contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(64.dp))
             }
             Column(Modifier.padding(start = 16.dp)) {
                 Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)

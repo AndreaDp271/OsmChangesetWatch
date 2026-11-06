@@ -5,7 +5,7 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
 ## Stato
 - [x] Fase 1 — scheletro e rete (completata, vedi sotto)
 - [x] Fase 2 — verificata su telefono (CPH2363): crea/modifica/disabilita/elimina, dati persistenti al riavvio
-- [ ] Fase 6
+- [x] Fase 6 — icona, i18n, README, LICENSE (GPL-3.0), CHANGELOG, fastlane, R8 release; restano: repo pubblico e tag
 
 ## Decisioni
 - Gradle 8.9, AGP 8.7.3, Kotlin 2.0.21, compileSdk/targetSdk 35, minSdk 26.
