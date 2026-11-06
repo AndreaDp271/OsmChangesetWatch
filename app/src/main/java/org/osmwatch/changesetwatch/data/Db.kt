@@ -96,6 +96,9 @@ interface ChangesetDao {
     @Query("SELECT * FROM changeset WHERE id = :id AND areaId = :areaId")
     fun observeOne(id: Long, areaId: Long): Flow<ChangesetRow?>
 
+    @Query("SELECT * FROM changeset WHERE id = :id LIMIT 1")
+    suspend fun findAny(id: Long): ChangesetRow?
+
     @Query("UPDATE changeset SET seen = 1 WHERE id = :id AND areaId = :areaId")
     suspend fun markSeen(id: Long, areaId: Long)
 }

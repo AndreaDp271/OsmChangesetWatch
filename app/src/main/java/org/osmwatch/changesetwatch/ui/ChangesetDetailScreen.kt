@@ -84,14 +84,14 @@ fun ChangesetDetailScreen(
             val fmt = { t: Long -> DateFormat.format("yyyy-MM-dd HH:mm", t).toString() }
             Text(row.comment ?: stringResource(R.string.no_comment), style = MaterialTheme.typography.titleMedium)
             Field(R.string.f_user, "${row.user ?: "?"}${row.uid?.let { " ($it)" } ?: ""}")
-            Field(R.string.f_area, areaName ?: "")
+            if (row.areaId != EXTERNAL) Field(R.string.f_area, areaName ?: "")
             Field(R.string.f_created, fmt(row.createdAt))
             Field(R.string.f_closed, row.closedAt?.let(fmt) ?: stringResource(R.string.f_open))
             Field(R.string.f_editor, row.createdBy ?: "?")
             row.source?.let { Field(R.string.f_source, it) }
             Field(R.string.f_changes, (row.changesCount ?: 0).toString())
             if (row.bboxMinLat != null) Field(R.string.f_bbox, "%.5f,%.5f → %.5f,%.5f".format(row.bboxMinLon, row.bboxMinLat, row.bboxMaxLon, row.bboxMaxLat))
-            Field(R.string.f_verdict, row.verdict.name)
+            if (row.areaId != EXTERNAL) Field(R.string.f_verdict, row.verdict.name)
             ChangesMap(row, geo, onElementTap)
             Button(onClick = { open(Links.OSM) }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) { Text(stringResource(R.string.open_osm)) }
             OutlinedButton(onClick = { open(Links.ACHAVI) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.open_achavi)) }

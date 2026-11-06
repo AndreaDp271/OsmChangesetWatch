@@ -44,6 +44,15 @@ class OsmClient(
         return execute(url) { ChangesetParser.parse(it.body!!.byteStream()) }
     }
 
+    fun fetchChangeset(id: Long): Changeset? =
+        execute("$baseUrl/changeset/$id".toHttpUrl()) { ChangesetParser.parse(it.body!!.byteStream()).firstOrNull() }
+
+    fun fetchChangesetsByUser(displayName: String, limit: Int = 50): List<Changeset> =
+        execute("$baseUrl/changesets".toHttpUrl().newBuilder()
+            .addQueryParameter("display_name", displayName).addQueryParameter("limit", limit.toString()).build()) {
+            ChangesetParser.parse(it.body!!.byteStream())
+        }
+
     fun fetchOsmChange(changesetId: Long): OsmChangeSummary =
         execute("$baseUrl/changeset/$changesetId/download".toHttpUrl()) {
             OsmChangeParser.parse(it.body!!.byteStream())

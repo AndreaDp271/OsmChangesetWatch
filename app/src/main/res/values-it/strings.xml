@@ -13,6 +13,10 @@
     <string name="delete">Elimina</string>
     <string name="cancel">Annulla</string>
     <string name="delete_area_title">Eliminare \"%1$s\"?</string>
+    <string name="search_hint">Cerca utente, commento, editor, id</string>
+    <string name="search_hint_global">Nome utente OSM o id changeset, poi Cerca</string>
+    <string name="areas_only">Solo le mie aree</string>
+    <string name="search_global_empty">Scrivi il nome esatto di un utente OSM o un id di changeset e premi Cerca.</string>
     <string name="unseen_only">Solo non visti</string>
     <string name="all_areas">Tutte le aree</string>
     <string name="no_areas_home">Aggiungi prima un\'area (icona mappa, in alto a destra).</string>

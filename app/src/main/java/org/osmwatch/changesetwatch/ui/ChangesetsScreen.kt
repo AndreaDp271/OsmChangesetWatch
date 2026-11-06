@@ -14,6 +14,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -38,6 +45,11 @@ import org.osmwatch.changesetwatch.data.WatchArea
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangesetsScreen(
+    query: String,
+    onQuery: (String) -> Unit,
+    areasOnly: Boolean,
+    onAreasOnly: (Boolean) -> Unit,
+    onSearch: () -> Unit,
     rows: List<ChangesetRow>,
     areas: List<WatchArea>,
     areaFilter: Long?,
@@ -71,6 +83,12 @@ fun ChangesetsScreen(
             LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) {
                 item {
                     FilterChip(
+                        selected = areasOnly, onClick = { onAreasOnly(!areasOnly) },
+                        label = { Text(stringResource(R.string.areas_only)) }, modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+                item {
+                    FilterChip(
                         selected = !includeSeen, onClick = { onIncludeSeen(!includeSeen) },
                         label = { Text(stringResource(R.string.unseen_only)) }, modifier = Modifier.padding(end = 8.dp),
                     )
@@ -94,13 +112,22 @@ fun ChangesetsScreen(
                     )
                 }
             }
+            OutlinedTextField(
+                value = query, onValueChange = onQuery, singleLine = true,
+                placeholder = { Text(stringResource(if (areasOnly) R.string.search_hint else R.string.search_hint_global)) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Default.Close, stringResource(R.string.clear)) } },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            )
             if (progress != null) Text(stringResource(R.string.verifying, progress), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(16.dp, 4.dp))
             if (error != null) Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp, 4.dp))
             PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh) {
                 LazyColumn {
                     if (rows.isEmpty()) item {
                         Text(
-                            stringResource(if (areas.isEmpty()) R.string.no_areas_home else R.string.no_changesets),
+                            stringResource(if (!areasOnly) R.string.search_global_empty else if (areas.isEmpty()) R.string.no_areas_home else R.string.no_changesets),
                             modifier = Modifier.padding(16.dp),
                         )
                     }
@@ -111,7 +138,7 @@ fun ChangesetsScreen(
                                 if (!r.seen) Row(Modifier.size(10.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)) {}
                                 else Row(Modifier.size(10.dp)) {}
                             },
-                            overlineContent = { Text("${r.user ?: "?"} · ${names[r.areaId] ?: ""}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            overlineContent = { Text(listOfNotNull(r.user ?: "?", names[r.areaId]).joinToString(" · "), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             headlineContent = {
                                 Text(r.comment ?: stringResource(R.string.no_comment), maxLines = 2, overflow = TextOverflow.Ellipsis)
                             },
@@ -119,7 +146,7 @@ fun ChangesetsScreen(
                                 val ago = DateUtils.getRelativeTimeSpanString(r.createdAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)
                                 Text("${r.createdBy ?: "?"} · $ago · ${androidx.compose.ui.res.pluralStringResource(R.plurals.changes_n, r.changesCount ?: 0, r.changesCount ?: 0)}", maxLines = 2, overflow = TextOverflow.Ellipsis)
                             },
-                            trailingContent = { Text(r.verdict.name, style = MaterialTheme.typography.labelSmall) },
+                            trailingContent = { if (r.areaId != EXTERNAL) Text(r.verdict.name, style = MaterialTheme.typography.labelSmall) },
                         )
                         HorizontalDivider()
                     }

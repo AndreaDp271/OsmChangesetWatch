@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -22,6 +23,7 @@ import org.osmwatch.changesetwatch.data.ChangesetRepository
 import org.osmwatch.changesetwatch.data.ChangesetRow
 import org.osmwatch.changesetwatch.data.Prefs
 import org.osmwatch.changesetwatch.data.WatchArea
+import org.osmwatch.changesetwatch.data.toRow
 import org.osmwatch.changesetwatch.domain.ChangeAction
 import org.osmwatch.changesetwatch.domain.ChangeGeometry
 import org.osmwatch.changesetwatch.domain.ElementData
@@ -57,15 +59,82 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     val areas: StateFlow<List<WatchArea>> =
         db.areaDao().observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Testo di ricerca: utente, commento, editor o id (filtro locale sulla lista). */
+    val query = MutableStateFlow("")
+
     val changesets: StateFlow<List<ChangesetRow>> =
         combine(areaFilter, includeSeen, showAll) { a, s, all -> Triple(a, s, all) }
             .flatMapLatest { (a, s, all) ->
                 val verdicts = if (all) Verdict.entries.map { it.name } else listOf(Verdict.CONFIRMED.name)
                 db.changesetDao().observe(a, s, verdicts)
             }
+            .combine(query) { rows, q ->
+                val t = q.trim()
+                if (t.isEmpty()) rows else rows.filter {
+                    it.id.toString().contains(t) || listOf(it.user, it.comment, it.createdBy).any { f -> f?.contains(t, ignoreCase = true) == true }
+                }
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun observeOne(id: Long, areaId: Long): Flow<ChangesetRow?> = db.changesetDao().observeOne(id, areaId)
+    /** Changeset aperto da link esterno e non presente in lista: non salvato nel DB (areaId = EXTERNAL). */
+    private val external = MutableStateFlow<Map<Long, ChangesetRow>>(emptyMap())
+
+    fun observeOne(id: Long, areaId: Long): Flow<ChangesetRow?> =
+        if (areaId == EXTERNAL) external.map { it[id] } else db.changesetDao().observeOne(id, areaId)
+
+    /** true (default): cerca solo tra i changeset delle aree; false: ricerca globale su OSM (utente esatto o id). */
+    val areasOnly = MutableStateFlow(true)
+    val globalResults = MutableStateFlow<List<ChangesetRow>>(emptyList())
+    val searching = MutableStateFlow(false)
+
+    /** Ricerca globale: numero = id changeset, altrimenti nome utente OSM esatto (l'API non cerca nei commenti). Max 50. */
+    fun searchGlobal() {
+        val q = query.value.trim()
+        if (q.isEmpty() || searching.value) return
+        viewModelScope.launch {
+            searching.value = true
+            error.value = null
+            try {
+                val found = withContext(Dispatchers.IO) {
+                    val id = q.removePrefix("#").toLongOrNull()
+                    if (id != null) listOfNotNull(client.fetchChangeset(id)) else client.fetchChangesetsByUser(q, 50)
+                }
+                val now = System.currentTimeMillis()
+                val rows = found.map { it.toRow(EXTERNAL, Verdict.PENDING, now).copy(seen = true) }
+                external.update { it + rows.associateBy { r -> r.id } }
+                globalResults.value = rows
+                if (rows.isEmpty()) error.value = "“$q”: not found"
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error.value = "“$q”: ${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                searching.value = false
+            }
+        }
+    }
+
+    /** Da richiesta di apertura (link) a [id, areaId] da mostrare; la UI lo consuma e lo azzera. */
+    val openRequest = MutableStateFlow<List<Long>?>(null)
+
+    /** Link `.../changeset/ID`: usa la riga in DB se c'è, altrimenti scarica solo l'intestazione dall'API. */
+    fun openLink(id: Long) {
+        viewModelScope.launch {
+            error.value = null
+            try {
+                val known = db.changesetDao().findAny(id)
+                if (known != null) { openRequest.value = listOf(id, known.areaId); return@launch }
+                val cs = withContext(Dispatchers.IO) { client.fetchChangeset(id) }
+                if (cs == null) { error.value = "#$id: not found"; return@launch }
+                external.update { it + (id to cs.toRow(EXTERNAL, Verdict.PENDING, System.currentTimeMillis()).copy(seen = true)) }
+                openRequest.value = listOf(id, EXTERNAL)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error.value = "#$id: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+    }
 
     // --- minimappa del changeset ---
     private val geoCache = HashMap<Long, GeoState>()
@@ -162,6 +231,9 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 }
+
+/** areaId fittizio dei changeset aperti da link e non appartenenti a nessuna area. */
+const val EXTERNAL = -1L
 
 sealed interface GeoState {
     data object Loading : GeoState

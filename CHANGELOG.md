@@ -9,3 +9,7 @@
 - Controllo in background (WorkManager) con notifiche raggruppate per area; intervallo da 15 min a 6 h.
 - Impostazioni nello stile ParkMap: tema, colori (blu o Material You), lingua (it/en), filtro, cache mappa.
 - Italiano e inglese; nessun servizio proprietario, nessun tracker.
+
+## Unreleased
+- Search box in the list (user, comment, editor, id); "Only my areas" filter off = global search by OSM user name or changeset id.
+- Opens openstreetmap.org/changeset/ID links from other apps and browsers.

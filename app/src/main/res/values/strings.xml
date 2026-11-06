@@ -14,6 +14,10 @@
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
     <string name="delete_area_title">Delete \"%1$s\"?</string>
+    <string name="search_hint">Search user, comment, editor, id</string>
+    <string name="search_hint_global">OSM user name or changeset id, then Search</string>
+    <string name="areas_only">Only my areas</string>
+    <string name="search_global_empty">Type an exact OSM user name or a changeset id and press Search.</string>
     <string name="unseen_only">Unseen only</string>
     <string name="all_areas">All areas</string>
     <string name="no_areas_home">Add an area first (map icon, top right).</string>
