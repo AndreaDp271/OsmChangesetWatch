@@ -1,0 +1,82 @@
+package org.osmwatch.changesetwatch.network
+
+import java.io.IOException
+import java.time.Instant
+import java.util.concurrent.TimeUnit
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import org.osmwatch.changesetwatch.domain.BBox
+import org.osmwatch.changesetwatch.domain.Changeset
+import org.osmwatch.changesetwatch.domain.OsmChangeSummary
+
+class OsmHttpException(val code: Int, message: String) : IOException(message)
+
+/** Client sincrono (da chiamare fuori dal main thread). Una richiesta alla volta. */
+class OsmClient(
+    private val http: OkHttpClient = defaultHttp(),
+    private val baseUrl: String = OsmConfig.BASE_URL,
+    private val sleep: (Long) -> Unit = { Thread.sleep(it) },
+) {
+
+    /**
+     * Changeset creati in [from, to) la cui bbox interseca [bbox], dal più recente. Max 100 (limite API).
+     * `from`/`to` filtrano per data di creazione (non `time`, che filtra per chiusura).
+     */
+    fun fetchChangesets(bbox: BBox, from: Instant? = null, to: Instant? = null, limit: Int = 100): List<Changeset> {
+        val url = "$baseUrl/changesets".toHttpUrl().newBuilder()
+            .addQueryParameter("bbox", bbox.toApiParam())
+            .addQueryParameter("limit", limit.toString())
+            .apply {
+                // `to` senza `from` viene ignorato dall'API
+                if (from != null) addQueryParameter("from", from.toString())
+                if (from != null && to != null) addQueryParameter("to", to.toString())
+            }
+            .build()
+        return execute(url) { ChangesetParser.parse(it.body!!.byteStream()) }
+    }
+
+    fun fetchOsmChange(changesetId: Long): OsmChangeSummary =
+        execute("$baseUrl/changeset/$changesetId/download".toHttpUrl()) {
+            OsmChangeParser.parse(it.body!!.byteStream())
+        }
+
+    private fun <T> execute(url: HttpUrl, parse: (Response) -> T): T {
+        val request = Request.Builder().url(url).header("User-Agent", OsmConfig.USER_AGENT).build()
+        var attempt = 0
+        while (true) {
+            try {
+                http.newCall(request).execute().use { r ->
+                    when {
+                        r.isSuccessful -> return parse(r)
+                        r.code == 429 || r.code >= 500 -> {
+                            if (attempt >= OsmConfig.MAX_RETRIES) throw OsmHttpException(r.code, "HTTP ${r.code} dopo $attempt retry")
+                            sleep(backoffMs(attempt, r.header("Retry-After")))
+                        }
+                        else -> throw OsmHttpException(r.code, "HTTP ${r.code}: ${r.body?.string()?.take(200)}")
+                    }
+                }
+            } catch (e: OsmHttpException) {
+                throw e
+            } catch (e: IOException) { // errori di rete: stesso backoff
+                if (attempt >= OsmConfig.MAX_RETRIES) throw e
+                sleep(backoffMs(attempt, null))
+            }
+            attempt++
+        }
+    }
+
+    companion object {
+        /** Retry-After in secondi (shortcut: la forma "data HTTP" non è gestita, si usa l'esponenziale). */
+        fun backoffMs(attempt: Int, retryAfter: String?): Long =
+            retryAfter?.trim()?.toLongOrNull()?.let { it.coerceIn(0, 300) * 1000 }
+                ?: (1000L shl attempt.coerceAtMost(6))
+
+        fun defaultHttp(): OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(OsmConfig.CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
+            .readTimeout(OsmConfig.READ_TIMEOUT_S, TimeUnit.SECONDS)
+            .build()
+    }
+}

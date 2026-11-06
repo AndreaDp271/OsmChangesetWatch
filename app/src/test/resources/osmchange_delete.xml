@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osmChange version="0.6">
+ <delete>
+  <node id="10" visible="false" version="3" changeset="2"/>
+ </delete>
+ <delete>
+  <node id="11" visible="false" version="2" changeset="2" lat="41.9" lon="12.5"/>
+ </delete>
+ <modify>
+  <relation id="99" version="4" changeset="2"><member type="way" ref="5" role=""/></relation>
+ </modify>
+</osmChange>

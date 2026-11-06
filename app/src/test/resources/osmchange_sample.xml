@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osmChange version="0.6" generator="openstreetmap-cgimap 2.1.1 (1268441 spike-08.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+ <create>
+  <node id="14354078315" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057653" lon="12.4838761"/>
+ </create>
+ <create>
+  <node id="14354078316" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057680" lon="12.4838602"/>
+ </create>
+ <create>
+  <node id="14354078317" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057701" lon="12.4838432"/>
+ </create>
+ <create>
+  <node id="14354078318" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057691" lon="12.4838269"/>
+ </create>
+ <create>
+  <node id="14354078319" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057656" lon="12.4838080"/>
+ </create>
+ <create>
+  <node id="14354078320" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057556" lon="12.4837964"/>
+ </create>
+ <create>
+  <node id="14354078321" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057429" lon="12.4837888"/>
+ </create>
+ <create>
+  <node id="14354078322" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057305" lon="12.4837830"/>
+ </create>
+ <create>
+  <node id="14354078323" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9058661" lon="12.4838667"/>
+ </create>
+ <create>
+  <way id="1576024995" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360">
+   <nd ref="12582245279"/>
+   <nd ref="14354078315"/>
+   <nd ref="14354078316"/>
+   <nd ref="14354078317"/>
+   <nd ref="14354078318"/>
+   <nd ref="14354078319"/>
+   <nd ref="14354078320"/>
+   <nd ref="14354078321"/>
+   <nd ref="14354078322"/>
+   <nd ref="12652680962"/>
+   <tag k="highway" v="footway"/>
+   <tag k="surface" v="sett"/>
+  </way>
+ </create>
+ <create>
+  <way id="1576024996" visible="true" version="1" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360">
+   <nd ref="12652620365"/>
+   <nd ref="14354078323"/>
+   <tag k="footway" v="sidewalk"/>
+   <tag k="highway" v="footway"/>
+  </way>
+ </create>
+ <modify>
+  <node id="12582245279" visible="true" version="2" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9057605" lon="12.4838903">
+   <tag k="barrier" v="kerb"/>
+   <tag k="kerb" v="raised"/>
+  </node>
+ </modify>
+ <modify>
+  <node id="12652620365" visible="true" version="2" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360" lat="41.9058607" lon="12.4838619">
+   <tag k="barrier" v="kerb"/>
+   <tag k="kerb" v="raised"/>
+  </node>
+ </modify>
+ <modify>
+  <way id="1359336304" visible="true" version="2" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360">
+   <nd ref="12582245274"/>
+   <nd ref="12582245275"/>
+   <nd ref="12582245276"/>
+   <nd ref="12582245277"/>
+   <nd ref="12582245278"/>
+   <nd ref="12582245279"/>
+   <tag k="footway" v="sidewalk"/>
+   <tag k="highway" v="footway"/>
+   <tag k="surface" v="paving_stones"/>
+  </way>
+ </modify>
+ <modify>
+  <way id="1366261684" visible="true" version="2" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360">
+   <nd ref="12652620366"/>
+   <nd ref="12652620367"/>
+   <nd ref="12652620368"/>
+   <nd ref="12652620369"/>
+   <nd ref="12652620370"/>
+   <nd ref="12652620371"/>
+   <nd ref="12652620372"/>
+   <nd ref="14354078323"/>
+   <nd ref="12652620373"/>
+   <nd ref="3698867126"/>
+   <tag k="footway" v="sidewalk"/>
+   <tag k="highway" v="footway"/>
+  </way>
+ </modify>
+ <modify>
+  <way id="1366255687" visible="true" version="3" changeset="191549916" timestamp="2026-11-06T09:45:32Z" user="MartaMag" uid="14910360">
+   <nd ref="12652586374"/>
+   <nd ref="12652586377"/>
+   <nd ref="12652586379"/>
+   <nd ref="12652586378"/>
+   <nd ref="12652680960"/>
+   <nd ref="12652680961"/>
+   <nd ref="12652680962"/>
+   <tag k="footway" v="sidewalk"/>
+   <tag k="highway" v="footway"/>
+   <tag k="surface" v="paving_stones"/>
+  </way>
+ </modify>
+</osmChange>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="OpenStreetMap server" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+<changeset id="191551665" created_at="2026-11-06T10:30:10Z" open="false" comments_count="0" changes_count="50" created_count="41" modified_count="9" deleted_count="0" closed_at="2026-11-06T10:30:11Z" min_lat="41.9068477" min_lon="12.4772154" max_lat="41.9114616" max_lon="12.4826473" uid="14910360" user="MartaMag">
+  <tag k="changesets_count" v="594"/>
+  <tag k="comment" v="added sidewalks and crossings"/>
+  <tag k="created_by" v="iD 2.42.3"/>
+  <tag k="host" v="https://www.openstreetmap.org/edit"/>
+  <tag k="imagery_used" v="Bing Maps Aerial"/>
+  <tag k="locale" v="en-US"/>
+</changeset>
+<changeset id="191549916" created_at="2026-11-06T09:45:32Z" open="false" comments_count="0" changes_count="16" created_count="11" modified_count="5" deleted_count="0" closed_at="2026-11-06T09:45:32Z" min_lat="41.9040563" min_lon="12.4836448" max_lat="41.9059895" max_lon="12.4858186" uid="14910360" user="MartaMag">
+  <tag k="changesets_count" v="593"/>
+  <tag k="comment" v="added footway and kerbs"/>
+  <tag k="created_by" v="iD 2.42.3"/>
+  <tag k="host" v="https://www.openstreetmap.org/edit"/>
+  <tag k="imagery_used" v="Bing Maps Aerial"/>
+  <tag k="locale" v="en-US"/>
+  <tag k="resolved:almost_junction:highway-highway" v="1"/>
+</changeset>
+<changeset id="191542710" created_at="2026-11-06T05:50:09Z" open="false" comments_count="0" changes_count="30" created_count="26" modified_count="4" deleted_count="0" closed_at="2026-11-06T05:50:09Z" min_lat="41.9112366" min_lon="12.4810578" max_lat="41.9148927" max_lon="12.4852728" uid="15262530" user="Pavol33">
+  <tag k="changesets_count" v="3885"/>
+  <tag k="comment" v="pridanie objektov"/>
+  <tag k="created_by" v="iD 2.42.3"/>
+  <tag k="host" v="https://www.openstreetmap.org/edit"/>
+  <tag k="imagery_used" v="Bing Maps Aerial"/>
+  <tag k="locale" v="sk"/>
+  <tag k="source" v="survey"/>
+</changeset>
+</osm>

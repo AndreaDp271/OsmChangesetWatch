@@ -1,0 +1,72 @@
+package org.osmwatch.changesetwatch.network
+
+import java.time.Instant
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
+import org.junit.Test
+import org.osmwatch.changesetwatch.domain.BBox
+
+class OsmClientTest {
+    private val server = MockWebServer()
+    private val sleeps = mutableListOf<Long>()
+    private val empty = """<osm version="0.6"></osm>"""
+
+    private fun client(): OsmClient {
+        server.start()
+        return OsmClient(baseUrl = server.url("/api/0.6").toString().trimEnd('/'), sleep = { sleeps += it })
+    }
+
+    @After fun tearDown() = server.shutdown()
+
+    @Test fun request_hasUserAgentAndParams() {
+        server.enqueue(MockResponse().setBody(empty))
+        client().fetchChangesets(BBox(41.0, 12.0, 42.0, 13.0), from = Instant.parse("2026-01-01T00:00:00Z"))
+        val r = server.takeRequest()
+        assertEquals(OsmConfig.USER_AGENT, r.getHeader("User-Agent"))
+        val u = r.requestUrl!!
+        assertEquals("12.0,41.0,13.0,42.0", u.queryParameter("bbox")) // W,S,E,N
+        assertEquals("2026-01-01T00:00:00Z", u.queryParameter("from"))
+        assertEquals("100", u.queryParameter("limit"))
+    }
+
+    @Test fun retries429HonoringRetryAfter_thenSucceeds() {
+        server.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "7"))
+        server.enqueue(MockResponse().setResponseCode(503))
+        server.enqueue(MockResponse().setBody(empty))
+        client().fetchChangesets(BBox(0.0, 0.0, 1.0, 1.0))
+        assertEquals(listOf(7000L, 2000L), sleeps) // Retry-After, poi esponenziale (attempt 1)
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test fun givesUpAfterMaxRetries() {
+        repeat(OsmConfig.MAX_RETRIES + 1) { server.enqueue(MockResponse().setResponseCode(500)) }
+        try { client().fetchChangesets(BBox(0.0, 0.0, 1.0, 1.0)); fail() } catch (e: OsmHttpException) {
+            assertEquals(500, e.code)
+        }
+        assertEquals(OsmConfig.MAX_RETRIES + 1, server.requestCount)
+    }
+
+    @Test fun clientError_noRetry() {
+        server.enqueue(MockResponse().setResponseCode(400).setBody("bad bbox"))
+        try { client().fetchChangesets(BBox(0.0, 0.0, 1.0, 1.0)); fail() } catch (e: OsmHttpException) {
+            assertEquals(400, e.code)
+        }
+        assertTrue(sleeps.isEmpty())
+    }
+
+    /** Chiamata reale: `OSM_LIVE=1 gradlew testDebugUnitTest --tests "*liveCall*"`. Saltato di default. */
+    @Test fun liveCall() {
+        assumeTrue(System.getenv("OSM_LIVE") == "1")
+        val c = OsmClient()
+        val list = c.fetchChangesets(BBox(41.88, 12.45, 41.92, 12.52), limit = 5)
+        println("LIVE: ${list.size} changesets, primo=${list.firstOrNull()?.id}")
+        assertTrue(list.isNotEmpty())
+        val s = c.fetchOsmChange(list.first().id)
+        println("LIVE: osmChange nodi=${s.nodes.size} way=${s.wayCount} rel=${s.relationCount}")
+    }
+}
