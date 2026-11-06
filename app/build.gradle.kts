@@ -10,7 +10,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "org.osmwatch.changesetwatch" // provvisorio, domanda aperta #2
+        applicationId = "io.github.andreadp271.osmwatch"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

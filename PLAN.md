@@ -18,7 +18,7 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
 - Stile condiviso con ParkMap (repo AndreaDp271/Park_finder-APK): Theme.kt (stessa palette blu), Common.kt (Bar/Group/Item/Choice), settings con tema/palette/lingua. Icone material-icons-extended (R8 in release in fase 6). Updater GitHub NON portato (F-Droid).
 - Background: `time=T1[,T2]` (chiusi dopo T1 o aperti) + paginazione T2=created_at più vecchio+1s, max 5 pagine; primo giro = seed senza notifica; notifica 1 per area (id = areaId).
 - Mappa: osmdroid 6.1.20 (scelta confermata dall autore). Room 2.6.1 + KSP.
-- applicationId provvisorio `org.osmwatch.changesetwatch`; licenza e soglie filtro: domande aperte.
+- applicationId `io.github.andreadp271.osmwatch` (scelto dall autore, coerente con ParkMap); namespace/package Kotlin resta org.osmwatch.changesetwatch. Licenza e soglie filtro: domande aperte.
 
 ## Test
 - `./gradlew.bat testDebugUnitTest` (9 test, passano)
