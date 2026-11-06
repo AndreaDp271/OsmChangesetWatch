@@ -1,4 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OSM Changeset Watch</string>
+    <string name="areas">Watched areas</string>
+    <string name="new_area">New area</string>
+    <string name="edit_area">Edit area</string>
+    <string name="area_name">Name</string>
+    <string name="area_km2">≈ %1$,.0f km²</string>
+    <string name="area_too_big">very large area</string>
+    <string name="map_hint">Drag the corners to resize, the inside to move.</string>
+    <string name="no_areas">No areas yet. Tap + to add one.</string>
+    <string name="save">Save</string>
+    <string name="back">Back</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete_area_title">Delete \"%1$s\"?</string>
 </resources>

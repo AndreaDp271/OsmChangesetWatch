@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="areas">Aree osservate</string>
+    <string name="new_area">Nuova area</string>
+    <string name="edit_area">Modifica area</string>
+    <string name="area_name">Nome</string>
+    <string name="area_km2">≈ %1$,.0f km²</string>
+    <string name="area_too_big">area molto grande</string>
+    <string name="map_hint">Trascina gli angoli per ridimensionare, l\'interno per spostare.</string>
+    <string name="no_areas">Nessuna area. Tocca + per aggiungerne una.</string>
+    <string name="save">Salva</string>
+    <string name="back">Indietro</string>
+    <string name="delete">Elimina</string>
+    <string name="cancel">Annulla</string>
+    <string name="delete_area_title">Eliminare \"%1$s\"?</string>
+</resources>

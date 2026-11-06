@@ -4,7 +4,7 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
 
 ## Stato
 - [x] Fase 1 — scheletro e rete (completata, vedi sotto)
-- [ ] Fase 2 — aree e persistenza (Room, mappa, editor area)
+- [~] Fase 2 — codice pronto e compila; manca il test su telefono (creo/modifico/disabilito/elimino, riavvio)
 - [ ] Fasi 3-6
 
 ## Decisioni
@@ -14,6 +14,7 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
   Paginazione (fase 4): ripetere con `to=` = created_at dell'ultimo ricevuto.
 - User-Agent in `OsmConfig.USER_AGENT` (URL contatto da sostituire: CHANGEME).
 - Test JVM del parser usano kxml2+xmlpull solo come testImplementation.
+- Mappa: osmdroid 6.1.20 (scelta confermata dall autore). Room 2.6.1 + KSP.
 - applicationId provvisorio `org.osmwatch.changesetwatch`; licenza e soglie filtro: domande aperte.
 
 ## Test
@@ -25,4 +26,4 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
 - Nodi cancellati nel osmChange: coordinate presenti o no? (il parser le accetta null; fixture `osmchange_delete.xml` è scritta a mano)
 
 ## Prossimo passo
-Fase 2: scegliere mappa (MapLibre vs osmdroid), Room, editor area.
+Provare l APK su telefono (adb install -r app/build/outputs/apk/debug/app-debug.apk), poi Fase 3.
