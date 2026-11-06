@@ -7,7 +7,8 @@ import org.junit.Test
 import org.osmwatch.changesetwatch.network.HistoryParser
 
 class ElementHistoryTest {
-    private val xml = """<osm>
+    private val xml =
+        """<osm>
         <node id="7" visible="true" version="1" changeset="100" timestamp="2020-01-01T00:00:00Z" user="a" uid="1" lat="45.0" lon="11.0">
           <tag k="shop" v="bakery"/></node>
         <node id="7" visible="true" version="2" changeset="200" timestamp="2021-01-01T00:00:00Z" user="b" uid="2" lat="45.001" lon="11.0">
@@ -15,7 +16,8 @@ class ElementHistoryTest {
         <node id="7" visible="false" version="3" changeset="300" timestamp="2022-01-01T00:00:00Z" user="c" uid="3"/>
         </osm>"""
 
-    @Test fun parsesVersions() {
+    @Test
+    fun parsesVersions() {
         val v = HistoryParser.parse(xml.byteInputStream())
         assertEquals(listOf(1, 2, 3), v.map { it.version })
         assertEquals(200L, v[1].changeset)
@@ -25,8 +27,13 @@ class ElementHistoryTest {
         assertNull(v[2].data.at)
     }
 
-    @Test fun diffsNewestFirst() {
-        val d = ElementHistory.diffs(ElementRef(ElementType.NODE, 7, null), HistoryParser.parse(xml.byteInputStream()))
+    @Test
+    fun diffsNewestFirst() {
+        val d =
+            ElementHistory.diffs(
+                ElementRef(ElementType.NODE, 7, null),
+                HistoryParser.parse(xml.byteInputStream()),
+            )
         assertEquals(listOf(3, 2, 1), d.map { it.first.version })
         assertEquals(ChangeAction.DELETE, d[0].second.action)
         assertEquals(ChangeAction.MODIFY, d[1].second.action)

@@ -55,7 +55,6 @@ import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.WatchArea
 import org.osmwatch.changesetwatch.data.glyphRings
 import org.osmwatch.changesetwatch.data.shape
-import org.osmwatch.changesetwatch.domain.Geometry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,13 +76,28 @@ fun AreasScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.areas), fontWeight = FontWeight.SemiBold) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) } },
-                actions = { IconButton(onClick = { userDialog = true }) { Icon(Icons.Default.PersonAdd, stringResource(R.string.watch_user)) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { userDialog = true }) {
+                        Icon(Icons.Default.PersonAdd, stringResource(R.string.watch_user))
+                    }
+                },
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    ),
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = onAdd, icon = { Icon(Icons.Default.Add, null) }, text = { Text(stringResource(R.string.new_area)) })
+            ExtendedFloatingActionButton(
+                onClick = onAdd,
+                icon = { Icon(Icons.Default.Add, null) },
+                text = { Text(stringResource(R.string.new_area)) },
+            )
         },
     ) { pad ->
         val (places, users) = areas.orEmpty().partition { it.watchUser == null }
@@ -92,43 +106,88 @@ fun AreasScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (areas?.isEmpty() == true) item {
-                Column(Modifier.fillMaxWidth().padding(vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Place, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
-                    Text(stringResource(R.string.no_areas), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
+            if (areas?.isEmpty() == true)
+                item {
+                    Column(
+                        Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            Icons.Default.Place,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(40.dp),
+                        )
+                        Text(
+                            stringResource(R.string.no_areas),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 }
-            }
             if (places.isNotEmpty()) item { SectionTitle(stringResource(R.string.section_places)) }
-            items(places, key = { it.id }) { a -> AreaCard(a, unseen[a.id] ?: 0, { onEdit(a) }, { onToggle(a, it) }) { toDelete = a } }
+            items(places, key = { it.id }) { a ->
+                AreaCard(a, unseen[a.id] ?: 0, { onEdit(a) }, { onToggle(a, it) }) { toDelete = a }
+            }
             if (users.isNotEmpty()) item { SectionTitle(stringResource(R.string.section_users)) }
-            items(users, key = { it.id }) { a -> AreaCard(a, unseen[a.id] ?: 0, null, { onToggle(a, it) }) { toDelete = a } }
+            items(users, key = { it.id }) { a ->
+                AreaCard(a, unseen[a.id] ?: 0, null, { onToggle(a, it) }) { toDelete = a }
+            }
         }
     }
-    if (userDialog) AlertDialog(
-        onDismissRequest = { userDialog = false },
-        icon = { Icon(Icons.Default.PersonAdd, null) },
-        title = { Text(stringResource(R.string.watch_user)) },
-        text = {
-            Column {
-                Text(stringResource(R.string.watch_user_desc))
-                OutlinedTextField(
-                    value = userName, onValueChange = { userName = it }, singleLine = true,
-                    label = { Text(stringResource(R.string.osm_user_name)) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = userName.isNotBlank(), onClick = { onWatchUser(userName); userName = ""; userDialog = false }) { Text(stringResource(R.string.watch_user_add)) }
-        },
-        dismissButton = { TextButton(onClick = { userDialog = false }) { Text(stringResource(R.string.cancel)) } },
-    )
+    if (userDialog)
+        AlertDialog(
+            onDismissRequest = { userDialog = false },
+            icon = { Icon(Icons.Default.PersonAdd, null) },
+            title = { Text(stringResource(R.string.watch_user)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.watch_user_desc))
+                    OutlinedTextField(
+                        value = userName,
+                        onValueChange = { userName = it },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.osm_user_name)) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = userName.isNotBlank(),
+                    onClick = {
+                        onWatchUser(userName)
+                        userName = ""
+                        userDialog = false
+                    },
+                ) {
+                    Text(stringResource(R.string.watch_user_add))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { userDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     toDelete?.let { a ->
         AlertDialog(
             onDismissRequest = { toDelete = null },
             title = { Text(stringResource(R.string.delete_area_title, a.name)) },
-            confirmButton = { TextButton(onClick = { onDelete(a); toDelete = null }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { toDelete = null }) { Text(stringResource(R.string.cancel)) } },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete(a)
+                        toDelete = null
+                    }
+                ) {
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { toDelete = null }) { Text(stringResource(R.string.cancel)) }
+            },
         )
     }
 }
@@ -136,36 +195,74 @@ fun AreasScreen(
 @Composable
 private fun SectionTitle(text: String) {
     Text(
-        text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold,
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 8.dp, top = 12.dp),
     )
 }
 
-/** Scheda di un'area (o di un utente seguito): impronta, nome, dimensione, ultimo controllo, non visti, interruttore. */
+/**
+ * Scheda di un'area (o di un utente seguito): impronta, nome, dimensione, ultimo controllo, non
+ * visti, interruttore.
+ */
 @Composable
-private fun AreaCard(a: WatchArea, unseen: Int, onEdit: (() -> Unit)?, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
+private fun AreaCard(
+    a: WatchArea,
+    unseen: Int,
+    onEdit: (() -> Unit)?,
+    onToggle: (Boolean) -> Unit,
+    onDelete: () -> Unit,
+) {
     val user = a.watchUser != null
     Surface(
-        shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).then(if (onEdit != null) Modifier.clickable(onClick = onEdit) else Modifier),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp,
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .then(if (onEdit != null) Modifier.clickable(onClick = onEdit) else Modifier),
     ) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Footprint(
-                area = if (user) null else a.bbox, change = null, color = MaterialTheme.colorScheme.primary,
-                areaRings = a.glyphRings, fillArea = true,
-                fallbackIcon = Icons.Default.Person, modifier = Modifier.alpha(if (a.enabled) 1f else 0.45f),
+                area = if (user) null else a.bbox,
+                change = null,
+                color = MaterialTheme.colorScheme.primary,
+                areaRings = a.glyphRings,
+                fillArea = true,
+                fallbackIcon = Icons.Default.Person,
+                modifier = Modifier.alpha(if (a.enabled) 1f else 0.45f),
             )
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        a.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                        a.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (unseen > 0) Pill(stringResource(R.string.unseen_n, unseen), MaterialTheme.colorScheme.primary, Modifier.padding(start = 8.dp))
+                    if (unseen > 0)
+                        Pill(
+                            stringResource(R.string.unseen_n, unseen),
+                            MaterialTheme.colorScheme.primary,
+                            Modifier.padding(start = 8.dp),
+                        )
                 }
-                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    Modifier.padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     if (user) Meta(Icons.Default.Person, stringResource(R.string.watched_user_desc))
-                    else Meta(if (a.polygon != null) Icons.Default.LocationCity else Icons.Default.SquareFoot, stringResource(R.string.area_km2, a.shape.areaKm2()))
+                    else
+                        Meta(
+                            if (a.polygon != null) Icons.Default.LocationCity
+                            else Icons.Default.SquareFoot,
+                            stringResource(R.string.area_km2, a.shape.areaKm2()),
+                        )
                     Meta(
                         Icons.Default.Schedule,
                         a.lastCheckedAt?.let { relativeTime(it) }
@@ -174,7 +271,13 @@ private fun AreaCard(a: WatchArea, unseen: Int, onEdit: (() -> Unit)?, onToggle:
                 }
             }
             Switch(checked = a.enabled, onCheckedChange = onToggle)
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, stringResource(R.string.delete), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Default.Delete,
+                    stringResource(R.string.delete),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

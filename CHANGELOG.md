@@ -26,3 +26,6 @@
 - Element history inside the app, with the differences between versions and links to each changeset.
 - Maps zoom up to 21; they open at most at zoom 19, where OSM tiles exist, and enlarge those beyond it (zoom 29 was unreadable).
 - Relative times ("4 hours ago") follow the app language instead of the system language.
+- New icon: a way with a moved node and its previous position; the notification icon matches it.
+- Updates from GitHub releases inside the app: daily check at startup (can be turned off), download with progress, install only if signed like the installed app.
+- Code formatted with ktfmt through Spotless; repeated error handling merged into one helper.

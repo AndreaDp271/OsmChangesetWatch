@@ -10,7 +10,8 @@ import org.osmwatch.changesetwatch.domain.ChangeAction
 class ParsersTest {
     private fun res(name: String) = javaClass.classLoader!!.getResourceAsStream(name)!!
 
-    @Test fun changesets_parsedWithBboxAndTags() {
+    @Test
+    fun changesets_parsedWithBboxAndTags() {
         val list = ChangesetParser.parse(res("changesets_sample.xml"))
         assertEquals(3, list.size)
         val c = list[0]
@@ -30,7 +31,8 @@ class ParsersTest {
         assertNull(c.source)
     }
 
-    @Test fun changeset_withoutBbox_hasNullBbox() {
+    @Test
+    fun changeset_withoutBbox_hasNullBbox() {
         val c = ChangesetParser.parse(res("changesets_nobbox.xml")).single()
         assertNull(c.bbox)
         assertNull(c.closedAt)
@@ -38,7 +40,8 @@ class ParsersTest {
         assertEquals(emptyMap<String, String>(), c.tags)
     }
 
-    @Test fun osmChange_countsNodesWaysAndActions() {
+    @Test
+    fun osmChange_countsNodesWaysAndActions() {
         val s = OsmChangeParser.parse(res("osmchange_sample.xml"))
         assertEquals(11, s.nodes.size)
         assertEquals(5, s.wayCount)
@@ -47,7 +50,8 @@ class ParsersTest {
         assertEquals(true, s.nodes.any { it.action == ChangeAction.CREATE })
     }
 
-    @Test fun osmChange_deleteWithoutCoordsAndRelation() {
+    @Test
+    fun osmChange_deleteWithoutCoordsAndRelation() {
         val s = OsmChangeParser.parse(res("osmchange_delete.xml"))
         assertEquals(2, s.nodes.size)
         assertNull(s.nodes[0].lat)

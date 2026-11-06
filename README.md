@@ -69,7 +69,8 @@ flowchart LR
 
 - **Nessun account obbligatorio, nessuna pubblicità, nessun tracker.** Niente Google Play Services, Firebase, analytics o crash reporter.
 - **Il login OSM è facoltativo** e serve solo per commentare. Usa OAuth2 con PKCE, senza segreti dentro l'app, e chiede il solo permesso `write_changeset_comments`. Il token è cifrato con l'Android Keystore.
-- **Permessi:** `INTERNET`, `ACCESS_NETWORK_STATE` e `POST_NOTIFICATIONS` (da Android 13). Nessun accesso alla posizione.
+- **Permessi:** `INTERNET`, `ACCESS_NETWORK_STATE`, `POST_NOTIFICATIONS` (da Android 13) e `REQUEST_INSTALL_PACKAGES` per installare gli aggiornamenti. Nessun accesso alla posizione.
+- **Aggiornamenti:** una volta al giorno, all'avvio, l'app chiede a GitHub qual è l'ultima release; si può spegnere nelle impostazioni. L'APK scaricato si installa solo se ha lo stesso package, la stessa firma dell'app installata e una versione più alta.
 
 ## Rispetto per i server OSM
 
@@ -95,11 +96,14 @@ flowchart LR
 ./gradlew testDebugUnitTest     # test JVM: parser, geometria, verifica, client
 ./gradlew assembleDebug         # APK di debug
 ./gradlew assembleRelease       # release con R8
+./gradlew spotlessApply         # formatta il codice (ktfmt, stile kotlinlang); spotlessCheck lo verifica
 OSM_LIVE=1 ./gradlew testDebugUnitTest --tests "*LiveVerifyTest*" -i   # prova sull'API vera
 ```
 
 - Serve JDK 17, con Android SDK 35 e il Gradle wrapper. Nessuno step scarica binari, solo dipendenze Maven.
 - La release viene firmata solo se esporti `OSMWATCH_KEYSTORE`, `_KEYSTORE_PASSWORD`, `_KEY_ALIAS` e `_KEY_PASSWORD`.
+- Per pubblicare un aggiornamento crea una release su GitHub con tag `vX.Y.Z` e l'APK firmato come allegato: le app installate lo trovano da sole.
+- `-PnoUpdater` toglie il controllo degli aggiornamenti dall'app, per le build distribuite da F-Droid, che aggiorna da sé.
 
 **Stack:**
 - Kotlin, Jetpack Compose e Material 3, Room, WorkManager;

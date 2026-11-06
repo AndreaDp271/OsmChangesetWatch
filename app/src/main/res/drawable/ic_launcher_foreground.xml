@@ -1,11 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Way con un nodo spostato (arancione) e, tratteggiata, la sua posizione precedente.
+     I vector Android non hanno tratteggi: le lineette sono segmenti separati.
+     Scala 0.8 attorno al centro, così i nodi restano nella zona sicura (cerchio di 66 dp). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M54,26c-11.6,0 -21,9.4 -21,21c0,15.5 21,36 21,36s21,-20.5 21,-36c0,-11.6 -9.4,-21 -21,-21zM54,38.5a8.5,8.5 0 1,0 0.01,0z" />
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.8"
+        android:scaleY="0.8">
+        <!-- tratto di prima -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeAlpha="0.7"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:pathData="M44,52L46.12,49.88M48.95,47.05L51.07,44.93M53.9,42.1L56.02,39.98M58.99,37.84L61.95,37.34M65.89,36.68L68.85,36.19M72.8,35.53L75.76,35.04M79.7,34.38L82,34" />
+        <!-- nodo nella posizione di prima -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeAlpha="0.75"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:pathData="M64,38A6,6 0 0,1 63.2,41M61,43.2A6,6 0 0,1 58,44M55,43.2A6,6 0 0,1 52.8,41M52,38A6,6 0 0,1 52.8,35M55,32.8A6,6 0 0,1 58,32M61,32.8A6,6 0 0,1 63.2,35" />
+        <!-- way attuale -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M26,72L44,52L64,62L82,34" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M20.5,72a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0zM38.5,52a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0zM76.5,34a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0z" />
+        <!-- nodo spostato -->
+        <path
+            android:fillColor="#EA580C"
+            android:pathData="M57,62a7,7 0 1,0 14,0a7,7 0 1,0 -14,0z" />
+    </group>
 </vector>

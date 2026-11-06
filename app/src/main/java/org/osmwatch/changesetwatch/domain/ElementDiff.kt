@@ -16,20 +16,35 @@ data class ElementDiff(
 )
 
 object ElementDiffer {
-    /** [current]: stato nel changeset (null se cancellato); [previous]: versione v-1 (null se creato o non recuperabile). */
-    fun diff(ref: ElementRef, action: ChangeAction, current: ElementData?, previous: ElementData?): ElementDiff {
+    /**
+     * [current]: stato nel changeset (null se cancellato); [previous]: versione v-1 (null se creato
+     * o non recuperabile).
+     */
+    fun diff(
+        ref: ElementRef,
+        action: ChangeAction,
+        current: ElementData?,
+        previous: ElementData?,
+    ): ElementDiff {
         val old = previous?.tags.orEmpty()
         val new = current?.tags.orEmpty()
-        val tags = (old.keys + new.keys).sorted().mapNotNull { k ->
-            if (old[k] == new[k]) null else TagChange(k, old[k], new[k])
-        }
-        val moved = if (ref.type == ElementType.NODE && current?.at != null && previous?.at != null) distanceMeters(previous.at, current.at) else null
+        val tags =
+            (old.keys + new.keys).sorted().mapNotNull { k ->
+                if (old[k] == new[k]) null else TagChange(k, old[k], new[k])
+            }
+        val moved =
+            if (ref.type == ElementType.NODE && current?.at != null && previous?.at != null)
+                distanceMeters(previous.at, current.at)
+            else null
         val oldRefs = previous?.refs.orEmpty().toSet()
         val newRefs = current?.refs.orEmpty().toSet()
         val oldMembers = previous?.members.orEmpty().toSet()
         val newMembers = current?.members.orEmpty().toSet()
         return ElementDiff(
-            ref, action, tags, moved?.takeIf { it >= 0.5 },
+            ref,
+            action,
+            tags,
+            moved?.takeIf { it >= 0.5 },
             nodesAdded = if (previous == null) 0 else (newRefs - oldRefs).size,
             nodesRemoved = if (previous == null) 0 else (oldRefs - newRefs).size,
             membersAdded = if (previous == null) 0 else (newMembers - oldMembers).size,

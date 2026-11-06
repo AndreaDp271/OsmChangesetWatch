@@ -242,4 +242,24 @@
         <item quantity="one">%1$d versione</item>
         <item quantity="other">%1$d versioni</item>
     </plurals>
+    <string name="group_updates">Aggiornamenti</string>
+    <string name="updates">Cerca aggiornamenti</string>
+    <string name="settings_update">Impostazioni, aggiornamento disponibile</string>
+    <string name="update_checking">Controllo in corso…</string>
+    <string name="update_latest">Hai l\'ultima versione (%1$s)</string>
+    <string name="update_available">Disponibile la versione %1$s</string>
+    <string name="update_tap_to_check">Versione %1$s · tocca per controllare</string>
+    <string name="update_install">Scarica e installa</string>
+    <string name="update_allow">Consenti l\'installazione</string>
+    <string name="update_allow_desc">Android chiede di autorizzare l\'app a installare i propri aggiornamenti: attiva l\'opzione e torna qui.</string>
+    <string name="update_auto">Controlla all\'avvio</string>
+    <string name="update_auto_desc">Una volta al giorno cerca una nuova versione su GitHub</string>
+    <string name="update_note">Gli aggiornamenti arrivano dalla pagina ufficiale delle release su GitHub e si installano solo se firmati come questa app.</string>
+    <string name="update_http">GitHub ha risposto %1$d</string>
+    <string name="update_download_failed">Download non riuscito (%1$d)</string>
+    <string name="update_invalid_file">Il file scaricato non è un APK valido</string>
+    <string name="update_bad_signature">L\'APK scaricato non è firmato come questa app: installazione annullata</string>
+    <string name="update_not_newer">La versione scaricata non è più recente di quella installata</string>
+    <string name="update_no_space">Spazio di archiviazione insufficiente</string>
+    <string name="update_install_failed">Installazione non riuscita</string>
 </resources>

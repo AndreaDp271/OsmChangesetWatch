@@ -65,7 +65,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -82,14 +81,17 @@ import org.osmwatch.changesetwatch.data.WatchArea
 import org.osmwatch.changesetwatch.domain.AreaShape
 import org.osmwatch.changesetwatch.domain.BBox
 import org.osmwatch.changesetwatch.domain.Geometry
+import org.osmwatch.changesetwatch.domain.attempt
+import org.osmwatch.changesetwatch.domain.reason
 import org.osmwatch.changesetwatch.network.Nominatim
 import org.osmwatch.changesetwatch.network.OsmClient
 import org.osmwatch.changesetwatch.network.Place
 import org.osmwatch.changesetwatch.network.PlaceKind
 
 /**
- * [area] null = nuova area. Mappa a tutto schermo; in alto la ricerca di un luogo (comune, provincia...), in basso nome e salvataggio.
- * Scegliere un comune con confine fa dell'area il confine stesso (verifica precisa); "Usa un rettangolo" torna al rettangolo libero.
+ * [area] null = nuova area. Mappa a tutto schermo; in alto la ricerca di un luogo (comune,
+ * provincia...), in basso nome e salvataggio. Scegliere un comune con confine fa dell'area il
+ * confine stesso (verifica precisa); "Usa un rettangolo" torna al rettangolo libero.
  */
 @Composable
 fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -> Unit) {
@@ -103,7 +105,8 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
     val primary = MaterialTheme.colorScheme.primary.toArgb()
 
     var name by rememberSaveable { mutableStateOf(area?.name ?: "") }
-    var autoName by remember { mutableStateOf<String?>(null) } // nome messo dalla ricerca: si aggiorna se l'utente non l'ha cambiato
+    // nome messo dalla ricerca: si aggiorna se l'utente non l'ha cambiato
+    var autoName by remember { mutableStateOf<String?>(null) }
     var bbox by remember { mutableStateOf(area?.bbox) }
     var query by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Place>?>(null) }
@@ -111,7 +114,9 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
     var searchError by remember { mutableStateOf<String?>(null) }
     var lastSearchAt by remember { mutableLongStateOf(0L) }
     // confine scelto (anelli): se c'è, l'area è il confine e il rettangolo libero sparisce
-    var boundary by remember { mutableStateOf(AreaShape.decode(area?.polygon).takeIf { it.isNotEmpty() }) }
+    var boundary by remember {
+        mutableStateOf(AreaShape.decode(area?.polygon).takeIf { it.isNotEmpty() })
+    }
     var boundaryName by remember { mutableStateOf(if (area?.polygon != null) area.name else null) }
     var boundaryLoading by remember { mutableStateOf(false) }
 
@@ -125,7 +130,21 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
             if (e == Lifecycle.Event.ON_PAUSE) map.onPause()
         }
         lifecycle.addObserver(obs)
-        onDispose { lifecycle.removeObserver(obs); map.onDetach() }
+        onDispose {
+            lifecycle.removeObserver(obs)
+            map.onDetach()
+        }
+    }
+
+    /** Policy di Nominatim: al massimo una richiesta al secondo. */
+    suspend fun <T> nominatim(call: () -> T): T {
+        val wait = 1_100 - (System.currentTimeMillis() - lastSearchAt)
+        if (wait > 0) delay(wait)
+        return try {
+            withContext(Dispatchers.IO) { call() }
+        } finally {
+            lastSearchAt = System.currentTimeMillis()
+        }
     }
 
     fun search() {
@@ -135,19 +154,12 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
         scope.launch {
             searching = true
             searchError = null
-            try {
-                val wait = 1_100 - (System.currentTimeMillis() - lastSearchAt) // policy Nominatim: max 1 richiesta al secondo
-                if (wait > 0) delay(wait)
-                results = withContext(Dispatchers.IO) { Nominatim.search(http, q, lang) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                results = null
-                searchError = e.message ?: e.javaClass.simpleName
-            } finally {
-                lastSearchAt = System.currentTimeMillis()
-                searching = false
-            }
+            attempt { results = nominatim { Nominatim.search(http, q, lang) } }
+                .onFailure {
+                    results = null
+                    searchError = it.reason
+                }
+            searching = false
         }
     }
 
@@ -161,14 +173,20 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
         if (rings != null) {
             rect?.let { map.overlays.remove(it) }
             rings.forEach { ring ->
-                Polygon(map).apply {
-                    setPoints(ring.map { GeoPoint(it.lat, it.lon) })
-                    fillPaint.color = (primary and 0x00FFFFFF) or 0x2E000000
-                    outlinePaint.color = primary
-                    outlinePaint.strokeWidth = 2.5f * dens
-                    infoWindow = null
-                    setOnClickListener { _, _, _ -> true } // solo da vedere: nessun fumetto al tocco
-                }.also { map.overlays.add(0, it); shapes += it }
+                Polygon(map)
+                    .apply {
+                        setPoints(ring.map { GeoPoint(it.lat, it.lon) })
+                        fillPaint.color = (primary and 0x00FFFFFF) or 0x2E000000
+                        outlinePaint.color = primary
+                        outlinePaint.strokeWidth = 2.5f * dens
+                        infoWindow = null
+                        // solo da vedere: nessun fumetto al tocco
+                        setOnClickListener { _, _, _ -> true }
+                    }
+                    .also {
+                        map.overlays.add(0, it)
+                        shapes += it
+                    }
             }
         } else if (rect != null) {
             bbox?.let { rect.bbox = it }
@@ -183,32 +201,37 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
         boundary = p.outline.takeIf { it.isNotEmpty() }
         boundaryName = if (boundary != null) p.name else null
         render()
-        map.zoomToBoundingBox(BoundingBox(p.bbox.maxLat, p.bbox.maxLon, p.bbox.minLat, p.bbox.minLon), true, (72 * dens).toInt())
-        if (name.isBlank() || name == autoName) { name = p.name; autoName = p.name }
+        map.zoomToBoundingBox(
+            BoundingBox(p.bbox.maxLat, p.bbox.maxLon, p.bbox.minLat, p.bbox.minLon),
+            true,
+            (72 * dens).toInt(),
+        )
+        if (name.isBlank() || name == autoName) {
+            name = p.name
+            autoName = p.name
+        }
         query = p.name
         results = null
-        // confine meno semplificato (~20 m): sostituisce quello della ricerca se nel frattempo non hai cambiato scelta
+        // confine meno semplificato (~20 m): sostituisce quello della ricerca se nel frattempo non
+        // hai cambiato scelta
         val ref = p.osmRef ?: return
         if (boundary == null) return
         scope.launch {
             boundaryLoading = true
-            try {
-                val wait = 1_100 - (System.currentTimeMillis() - lastSearchAt)
-                if (wait > 0) delay(wait)
-                val detailed = withContext(Dispatchers.IO) { Nominatim.lookup(http, ref, lang) }
-                if (detailed != null && detailed.outline.isNotEmpty() && boundary != null && boundaryName == p.name) {
+            attempt { // se fallisce resta il confine della ricerca, un po' più semplificato
+                val detailed = nominatim { Nominatim.lookup(http, ref, lang) }
+                if (
+                    detailed != null &&
+                        detailed.outline.isNotEmpty() &&
+                        boundary != null &&
+                        boundaryName == p.name
+                ) {
                     boundary = detailed.outline
                     bbox = detailed.bbox
                     render()
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // resta il confine della ricerca, un po' più semplificato
-            } finally {
-                lastSearchAt = System.currentTimeMillis()
-                boundaryLoading = false
             }
+            boundaryLoading = false
         }
     }
 
@@ -223,12 +246,18 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
         val polygon = boundary?.let(AreaShape::encode)
         val moved = area != null && (area.bbox != b || area.polygon != polygon)
         onSave(
-            (area ?: WatchArea(name = "", minLat = 0.0, minLon = 0.0, maxLat = 0.0, maxLon = 0.0)).copy(
-                name = name.trim(),
-                minLat = b.minLat, minLon = b.minLon, maxLat = b.maxLat, maxLon = b.maxLon,
-                polygon = polygon,
-                lastCheckedAt = if (moved) null else area?.lastCheckedAt, // area cambiata: ricontrolla da capo
-            ),
+            (area ?: WatchArea(name = "", minLat = 0.0, minLon = 0.0, maxLat = 0.0, maxLon = 0.0))
+                .copy(
+                    name = name.trim(),
+                    minLat = b.minLat,
+                    minLon = b.minLon,
+                    maxLat = b.maxLat,
+                    maxLon = b.maxLon,
+                    polygon = polygon,
+                    lastCheckedAt =
+                        if (moved) null
+                        else area?.lastCheckedAt, // area cambiata: ricontrolla da capo
+                )
         )
     }
 
@@ -242,18 +271,41 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
                     setMultiTouchControls(true)
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     controller.setZoom(13.0)
-                    controller.setCenter(GeoPoint(area?.let { (it.minLat + it.maxLat) / 2 } ?: 41.9, area?.let { (it.minLon + it.maxLon) / 2 } ?: 12.5))
+                    controller.setCenter(
+                        GeoPoint(
+                            area?.let { (it.minLat + it.maxLat) / 2 } ?: 41.9,
+                            area?.let { (it.minLon + it.maxLon) / 2 } ?: 12.5,
+                        )
+                    )
                     val dens = resources.displayMetrics.density
                     post {
-                        if (box[0] == null) { // primo disegno: crea il rettangolo (resta nascosto se c'è un confine)
-                            val start = bbox ?: boundingBox.let { // nuova area: 40% centrale della vista
-                                val dLat = (it.latNorth - it.latSouth) * 0.3
-                                val dLon = (it.lonEast - it.lonWest) * 0.3
-                                BBox(it.latSouth + dLat, it.lonWest + dLon, it.latNorth - dLat, it.lonEast - dLon)
-                                    .also { b -> bbox = b }
-                            }
+                        if (
+                            box[0] == null
+                        ) { // primo disegno: crea il rettangolo (resta nascosto se c'è un confine)
+                            val start =
+                                bbox
+                                    ?: boundingBox.let { // nuova area: 40% centrale della vista
+                                        val dLat = (it.latNorth - it.latSouth) * 0.3
+                                        val dLon = (it.lonEast - it.lonWest) * 0.3
+                                        BBox(
+                                                it.latSouth + dLat,
+                                                it.lonWest + dLon,
+                                                it.latNorth - dLat,
+                                                it.lonEast - dLon,
+                                            )
+                                            .also { b -> bbox = b }
+                                    }
                             if (area != null) {
-                                zoomToBoundingBox(BoundingBox(start.maxLat, start.maxLon, start.minLat, start.minLon), false, (48 * dens).toInt())
+                                zoomToBoundingBox(
+                                    BoundingBox(
+                                        start.maxLat,
+                                        start.maxLon,
+                                        start.minLat,
+                                        start.minLon,
+                                    ),
+                                    false,
+                                    (48 * dens).toInt(),
+                                )
                             }
                             box[0] = BBoxOverlay(start, dens) { bbox = it }
                             render()
@@ -265,48 +317,106 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
 
         // in alto: indietro + ricerca, con i risultati sotto
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(12.dp)) {
-            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 6.dp) {
-                Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 6.dp,
+            ) {
+                Row(
+                    Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
+                    }
                     TextField(
-                        value = query, onValueChange = { query = it }, singleLine = true,
-                        placeholder = { Text(stringResource(R.string.search_place_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        placeholder = {
+                            Text(
+                                stringResource(R.string.search_place_hint),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { search() }),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-                        ),
+                        colors =
+                            TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                            ),
                         modifier = Modifier.weight(1f),
                     )
                     when {
-                        searching -> CircularProgressIndicator(Modifier.padding(12.dp).size(22.dp), strokeWidth = 2.5.dp)
-                        results != null || searchError != null -> IconButton(onClick = { results = null; searchError = null }) { Icon(Icons.Default.Close, stringResource(R.string.clear)) }
-                        else -> IconButton(onClick = ::search, enabled = query.isNotBlank()) { Icon(Icons.Default.Search, stringResource(R.string.search_place_hint)) }
+                        searching ->
+                            CircularProgressIndicator(
+                                Modifier.padding(12.dp).size(22.dp),
+                                strokeWidth = 2.5.dp,
+                            )
+                        results != null || searchError != null ->
+                            IconButton(
+                                onClick = {
+                                    results = null
+                                    searchError = null
+                                }
+                            ) {
+                                Icon(Icons.Default.Close, stringResource(R.string.clear))
+                            }
+                        else ->
+                            IconButton(onClick = ::search, enabled = query.isNotBlank()) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    stringResource(R.string.search_place_hint),
+                                )
+                            }
                     }
                 }
             }
             val list = results
             if (list != null || searchError != null) {
                 Surface(
-                    shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 6.dp,
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 6.dp,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 ) {
                     Column {
                         when {
-                            searchError != null -> Text(
-                                stringResource(R.string.search_place_error, searchError ?: ""), color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp),
-                            )
-                            list.isNullOrEmpty() -> Text(stringResource(R.string.search_place_none, query.trim()), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
-                            else -> LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                                items(list) { p ->
-                                    PlaceRow(p) { choose(p) }
-                                    HorizontalDivider(Modifier.padding(start = 56.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            searchError != null ->
+                                Text(
+                                    stringResource(R.string.search_place_error, searchError ?: ""),
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(16.dp),
+                                )
+                            list.isNullOrEmpty() ->
+                                Text(
+                                    stringResource(R.string.search_place_none, query.trim()),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(16.dp),
+                                )
+                            else ->
+                                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                                    items(list) { p ->
+                                        PlaceRow(p) { choose(p) }
+                                        HorizontalDivider(
+                                            Modifier.padding(start = 56.dp),
+                                            color =
+                                                MaterialTheme.colorScheme.outlineVariant.copy(
+                                                    alpha = 0.5f
+                                                ),
+                                        )
+                                    }
                                 }
-                            }
                         }
-                        Muted(stringResource(R.string.search_attribution), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp, top = 2.dp))
+                        Muted(
+                            stringResource(R.string.search_attribution),
+                            Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp, top = 2.dp),
+                        )
                     }
                 }
             }
@@ -314,50 +424,106 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
 
         // in basso: nome, superficie, salva
         Surface(
-            shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp,
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
         ) {
             Column(Modifier.padding(16.dp)) {
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it }, singleLine = true,
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
                     label = { Text(stringResource(R.string.area_name)) },
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 bbox?.let {
-                    val km2 = boundary?.let { r -> AreaShape(it, r).areaKm2() } ?: Geometry.areaKm2(it)
+                    val km2 =
+                        boundary?.let { r -> AreaShape(it, r).areaKm2() } ?: Geometry.areaKm2(it)
                     val big = km2 > Geometry.WARN_AREA_KM2
-                    Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Icon(
-                            if (big) Icons.Default.Warning else Icons.Default.SquareFoot, null, Modifier.size(20.dp),
-                            tint = if (big) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            if (big) Icons.Default.Warning else Icons.Default.SquareFoot,
+                            null,
+                            Modifier.size(20.dp),
+                            tint =
+                                if (big) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.primary,
                         )
                         Text(
-                            stringResource(R.string.area_km2, km2), style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.SemiBold,
-                            color = if (big) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                            stringResource(R.string.area_km2, km2),
+                            style = MaterialTheme.typography.titleMedium.tabular(),
+                            fontWeight = FontWeight.SemiBold,
+                            color =
+                                if (big) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(start = 8.dp),
                         )
                     }
-                    if (big) Text(stringResource(R.string.area_too_big), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                    if (big)
+                        Text(
+                            stringResource(R.string.area_too_big),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
                 }
                 if (boundary != null) {
-                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocationCity, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Row(
+                        Modifier.padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Default.LocationCity,
+                            null,
+                            Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                         Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                            Text(stringResource(R.string.boundary_of, boundaryName ?: name), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            Muted(stringResource(if (boundaryLoading) R.string.boundary_loading else R.string.boundary_hint))
+                            Text(
+                                stringResource(R.string.boundary_of, boundaryName ?: name),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Muted(
+                                stringResource(
+                                    if (boundaryLoading) R.string.boundary_loading
+                                    else R.string.boundary_hint
+                                )
+                            )
                         }
-                        TextButton(onClick = ::useRectangle) { Text(stringResource(R.string.use_rectangle)) }
+                        TextButton(onClick = ::useRectangle) {
+                            Text(stringResource(R.string.use_rectangle))
+                        }
                     }
                 } else {
-                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.OpenWith, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        Modifier.padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Default.OpenWith,
+                            null,
+                            Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         Muted(stringResource(R.string.map_hint), Modifier.padding(start = 8.dp))
                     }
                 }
-                Button(onClick = ::save, enabled = name.isNotBlank() && bbox != null, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                Button(
+                    onClick = ::save,
+                    enabled = name.isNotBlank() && bbox != null,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                ) {
                     Icon(Icons.Default.Check, null, Modifier.size(18.dp))
-                    Text(stringResource(R.string.save_area), modifier = Modifier.padding(start = 8.dp))
+                    Text(
+                        stringResource(R.string.save_area),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
                 }
             }
         }
@@ -366,19 +532,42 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
 
 @Composable
 private fun PlaceRow(p: Place, onClick: () -> Unit) {
-    val (icon, label) = when (p.kind) {
-        PlaceKind.REGION -> Icons.Default.Public to R.string.kind_region
-        PlaceKind.PROVINCE -> Icons.Default.Map to R.string.kind_province
-        PlaceKind.MUNICIPALITY -> Icons.Default.LocationCity to R.string.kind_municipality
-        PlaceKind.LOCALITY -> Icons.Default.Place to R.string.kind_locality
-        PlaceKind.OTHER -> Icons.Default.Place to R.string.kind_place
-    }
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    val (icon, label) =
+        when (p.kind) {
+            PlaceKind.REGION -> Icons.Default.Public to R.string.kind_region
+            PlaceKind.PROVINCE -> Icons.Default.Map to R.string.kind_province
+            PlaceKind.MUNICIPALITY -> Icons.Default.LocationCity to R.string.kind_municipality
+            PlaceKind.LOCALITY -> Icons.Default.Place to R.string.kind_locality
+            PlaceKind.OTHER -> Icons.Default.Place to R.string.kind_place
+        }
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
         Column(Modifier.weight(1f).padding(start = 16.dp)) {
-            Text(p.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (p.detail.isNotEmpty()) Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                p.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (p.detail.isNotEmpty())
+                Text(
+                    p.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
         }
-        Pill(stringResource(label), MaterialTheme.colorScheme.primary, Modifier.padding(start = 8.dp))
+        Pill(
+            stringResource(label),
+            MaterialTheme.colorScheme.primary,
+            Modifier.padding(start = 8.dp),
+        )
     }
 }

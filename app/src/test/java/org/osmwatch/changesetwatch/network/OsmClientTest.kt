@@ -18,14 +18,23 @@ class OsmClientTest {
 
     private fun client(): OsmClient {
         server.start()
-        return OsmClient(baseUrl = server.url("/api/0.6").toString().trimEnd('/'), sleep = { sleeps += it })
+        return OsmClient(
+            baseUrl = server.url("/api/0.6").toString().trimEnd('/'),
+            sleep = { sleeps += it },
+        )
     }
 
     @After fun tearDown() = server.shutdown()
 
-    @Test fun request_hasUserAgentAndParams() {
+    @Test
+    fun request_hasUserAgentAndParams() {
         server.enqueue(MockResponse().setBody(empty))
-        client().fetchChangesets(BBox(41.0, 12.0, 42.0, 13.0), closedAfter = Instant.parse("2026-01-01T00:00:00Z"), createdBefore = Instant.parse("2026-02-01T00:00:00Z"))
+        client()
+            .fetchChangesets(
+                BBox(41.0, 12.0, 42.0, 13.0),
+                closedAfter = Instant.parse("2026-01-01T00:00:00Z"),
+                createdBefore = Instant.parse("2026-02-01T00:00:00Z"),
+            )
         val r = server.takeRequest()
         assertEquals(OsmConfig.USER_AGENT, r.getHeader("User-Agent"))
         val u = r.requestUrl!!
@@ -34,7 +43,8 @@ class OsmClientTest {
         assertEquals("100", u.queryParameter("limit"))
     }
 
-    @Test fun userRequest_hasNameAndTime() {
+    @Test
+    fun userRequest_hasNameAndTime() {
         server.enqueue(MockResponse().setBody(empty))
         client().fetchChangesetsByUser("Anna B", 100, Instant.parse("2026-01-01T00:00:00Z"))
         val u = server.takeRequest().requestUrl!!
@@ -43,13 +53,24 @@ class OsmClientTest {
         assertEquals("100", u.queryParameter("limit"))
     }
 
-    @Test fun userRequest_olderPageUsesTimeRange() {
+    @Test
+    fun userRequest_olderPageUsesTimeRange() {
         server.enqueue(MockResponse().setBody(empty))
-        client().fetchChangesetsByUser("Anna", 100, Instant.EPOCH, Instant.parse("2026-03-01T00:00:00Z"))
-        assertEquals("1970-01-01T00:00:00Z,2026-03-01T00:00:00Z", server.takeRequest().requestUrl!!.queryParameter("time"))
+        client()
+            .fetchChangesetsByUser(
+                "Anna",
+                100,
+                Instant.EPOCH,
+                Instant.parse("2026-03-01T00:00:00Z"),
+            )
+        assertEquals(
+            "1970-01-01T00:00:00Z,2026-03-01T00:00:00Z",
+            server.takeRequest().requestUrl!!.queryParameter("time"),
+        )
     }
 
-    @Test fun retries429HonoringRetryAfter_thenSucceeds() {
+    @Test
+    fun retries429HonoringRetryAfter_thenSucceeds() {
         server.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "7"))
         server.enqueue(MockResponse().setResponseCode(503))
         server.enqueue(MockResponse().setBody(empty))
@@ -58,24 +79,36 @@ class OsmClientTest {
         assertEquals(3, server.requestCount)
     }
 
-    @Test fun givesUpAfterMaxRetries() {
+    @Test
+    fun givesUpAfterMaxRetries() {
         repeat(OsmConfig.MAX_RETRIES + 1) { server.enqueue(MockResponse().setResponseCode(500)) }
-        try { client().fetchChangesets(BBox(0.0, 0.0, 1.0, 1.0)); fail() } catch (e: OsmHttpException) {
+        try {
+            client().fetchChangesets(BBox(0.0, 0.0, 1.0, 1.0))
+            fail()
+        } catch (e: OsmHttpException) {
             assertEquals(500, e.code)
         }
         assertEquals(OsmConfig.MAX_RETRIES + 1, server.requestCount)
     }
 
-    @Test fun clientError_noRetry() {
+    @Test
+    fun clientError_noRetry() {
         server.enqueue(MockResponse().setResponseCode(400).setBody("bad bbox"))
-        try { client().fetchChangesets(BBox(0.0, 0.0, 1.0, 1.0)); fail() } catch (e: OsmHttpException) {
+        try {
+            client().fetchChangesets(BBox(0.0, 0.0, 1.0, 1.0))
+            fail()
+        } catch (e: OsmHttpException) {
             assertEquals(400, e.code)
         }
         assertTrue(sleeps.isEmpty())
     }
 
-    /** Chiamata reale: `OSM_LIVE=1 gradlew testDebugUnitTest --tests "*liveCall*"`. Saltato di default. */
-    @Test fun liveCall() {
+    /**
+     * Chiamata reale: `OSM_LIVE=1 gradlew testDebugUnitTest --tests "*liveCall*"`. Saltato di
+     * default.
+     */
+    @Test
+    fun liveCall() {
         assumeTrue(System.getenv("OSM_LIVE") == "1")
         val c = OsmClient()
         val list = c.fetchChangesets(BBox(41.88, 12.45, 41.92, 12.52), limit = 5)
@@ -87,31 +120,59 @@ class OsmClientTest {
 }
 
 class LiveGeometryTest {
-    /** `OSM_LIVE=1 OSM_CS=191555544 gradlew testDebugUnitTest --tests "*LiveGeometryTest*" -i`. Saltato di default. */
-    @Test fun liveGeometry() {
+    /**
+     * `OSM_LIVE=1 OSM_CS=191555544 gradlew testDebugUnitTest --tests "*LiveGeometryTest*" -i`.
+     * Saltato di default.
+     */
+    @Test
+    fun liveGeometry() {
         assumeTrue(System.getenv("OSM_LIVE") == "1")
         val id = (System.getenv("OSM_CS") ?: "191555544").toLong()
         val c = OsmClient()
         val s = c.fetchOsmChange(id)
-        val g = org.osmwatch.changesetwatch.domain.GeometryResolver.resolve(s, OsmElementSource(c), includeBefore = true)
-        println("LIVE: nodi=${s.nodes.size} way=${s.ways.size} rel=${s.relationCount} -> punti=${g.points.size} linee=${g.lines.size} parziale=${g.partial}")
+        val g =
+            org.osmwatch.changesetwatch.domain.GeometryResolver.resolve(
+                s,
+                OsmElementSource(c),
+                includeBefore = true,
+            )
+        println(
+            "LIVE: nodi=${s.nodes.size} way=${s.ways.size} rel=${s.relationCount} -> punti=${g.points.size} linee=${g.lines.size} parziale=${g.partial}"
+        )
         println("LIVE: before linee=${g.beforeLines.size} punti=${g.beforePoints.size}")
-        println("LIVE: azioni punti=${g.points.groupBy { it.action }.mapValues { it.value.size }} linee=${g.lines.groupBy { it.action }.mapValues { it.value.size }}")
+        println(
+            "LIVE: azioni punti=${g.points.groupBy { it.action }.mapValues { it.value.size }} linee=${g.lines.groupBy { it.action }.mapValues { it.value.size }}"
+        )
     }
 }
 
 class LiveVerifyTest {
-    /** `OSM_LIVE=1 gradlew testDebugUnitTest --tests "*LiveVerifyTest*" -i`: verdetti reali su 30 changeset di Roma. */
-    @Test fun liveVerify() {
+    /**
+     * `OSM_LIVE=1 gradlew testDebugUnitTest --tests "*LiveVerifyTest*" -i`: verdetti reali su 30
+     * changeset di Roma.
+     */
+    @Test
+    fun liveVerify() {
         assumeTrue(System.getenv("OSM_LIVE") == "1")
         val area = BBox(41.8512, 12.4705, 41.9415, 12.5447)
         val c = OsmClient()
         val list = c.fetchChangesets(area).take(30)
-        val v = org.osmwatch.changesetwatch.domain.ChangesetVerifier(2000, { Thread.sleep(700); c.fetchOsmChange(it) }, OsmElementSource(c, 300))
+        val v =
+            org.osmwatch.changesetwatch.domain.ChangesetVerifier(
+                2000,
+                {
+                    Thread.sleep(700)
+                    c.fetchOsmChange(it)
+                },
+                OsmElementSource(c, 300),
+            )
         val res = list.map { cs -> cs to v.verify(cs.id, cs.bbox, cs.changesCount, area) }
         println("LIVE: " + res.groupingBy { it.second }.eachCount())
-        res.filter { it.second != org.osmwatch.changesetwatch.domain.Verdict.CONFIRMED }.forEach {
-            println("LIVE: ${it.second} #${it.first.id} changes=${it.first.changesCount} bbox=${it.first.bbox}")
-        }
+        res.filter { it.second != org.osmwatch.changesetwatch.domain.Verdict.CONFIRMED }
+            .forEach {
+                println(
+                    "LIVE: ${it.second} #${it.first.id} changes=${it.first.changesCount} bbox=${it.first.bbox}"
+                )
+            }
     }
 }

@@ -1,6 +1,9 @@
 package org.osmwatch.changesetwatch.domain
 
-/** Editor e hashtag ricavati dai campi già salvati (created_by e commento): nessun dato in più nel DB. */
+/**
+ * Editor e hashtag ricavati dai campi già salvati (created_by e commento): nessun dato in più nel
+ * DB.
+ */
 object RowTags {
     private val HASHTAG = Regex("""#[\p{L}\p{N}_-]+""")
 

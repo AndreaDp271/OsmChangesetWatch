@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Versione piccola dell'icona: la way con il nodo spostato, senza il tratteggio (illeggibile a 24 dp). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M12,2C8.13,2 5,5.13 5,9c0,5.25 7,13 7,13s7,-7.75 7,-13c0,-3.87 -3.13,-7 -7,-7zM12,6.5a2.5,2.5 0 1,0 0.01,0z" />
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="53"
+        android:scaleX="1.25"
+        android:scaleY="1.25">
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M26,72L44,52L64,62L82,34" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M19,72a7,7 0 1,0 14,0a7,7 0 1,0 -14,0zM37,52a7,7 0 1,0 14,0a7,7 0 1,0 -14,0zM75,34a7,7 0 1,0 14,0a7,7 0 1,0 -14,0zM54,62a10,10 0 1,0 20,0a10,10 0 1,0 -20,0z" />
+    </group>
 </vector>

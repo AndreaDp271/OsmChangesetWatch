@@ -27,13 +27,19 @@ object UserParser {
                 "user" -> {
                     found = true
                     name = p.getAttributeValue(null, "display_name")
-                    created = p.getAttributeValue(null, "account_created")?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                    created =
+                        p.getAttributeValue(null, "account_created")?.let {
+                            runCatching { Instant.parse(it) }.getOrNull()
+                        }
                 }
-                "changesets" -> if (found && changesets == null) changesets = p.getAttributeValue(null, "count")?.toIntOrNull()
+                "changesets" ->
+                    if (found && changesets == null)
+                        changesets = p.getAttributeValue(null, "count")?.toIntOrNull()
                 "blocks" -> inBlocks = true
                 "roles" -> inRoles = true
                 "traces" -> if (found) traces = p.getAttributeValue(null, "count")?.toIntOrNull()
-                "received" -> if (inBlocks) blocks = p.getAttributeValue(null, "count")?.toIntOrNull()
+                "received" ->
+                    if (inBlocks) blocks = p.getAttributeValue(null, "count")?.toIntOrNull()
                 else -> if (inRoles) roles += p.name
             }
         }

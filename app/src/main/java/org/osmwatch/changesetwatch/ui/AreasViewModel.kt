@@ -19,19 +19,35 @@ class AreasViewModel(app: Application) : AndroidViewModel(app) {
         dao.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Monitoraggio di un utente OSM; il nome è esatto (maiuscole comprese). Ignora i doppioni. */
-    fun watchUser(name: String) = viewModelScope.launch {
-        val n = name.trim().removePrefix("@")
-        if (n.isNotEmpty() && areas.value.orEmpty().none { it.watchUser == n }) {
-            dao.upsert(WatchArea(name = "@$n", minLat = 0.0, minLon = 0.0, maxLat = 0.0, maxLon = 0.0, watchUser = n))
+    fun watchUser(name: String) =
+        viewModelScope.launch {
+            val n = name.trim().removePrefix("@")
+            if (n.isNotEmpty() && areas.value.orEmpty().none { it.watchUser == n }) {
+                dao.upsert(
+                    WatchArea(
+                        name = "@$n",
+                        minLat = 0.0,
+                        minLon = 0.0,
+                        maxLat = 0.0,
+                        maxLon = 0.0,
+                        watchUser = n,
+                    )
+                )
+            }
         }
-    }
 
     /** Non visti per area (id -> numero). */
-    val unseen: StateFlow<Map<Long, Int>> = AppDatabase.get(app).changesetDao().observeUnseenCounts()
-        .map { l -> l.associate { it.areaId to it.n } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    val unseen: StateFlow<Map<Long, Int>> =
+        AppDatabase.get(app)
+            .changesetDao()
+            .observeUnseenCounts()
+            .map { l -> l.associate { it.areaId to it.n } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     fun save(area: WatchArea) = viewModelScope.launch { dao.upsert(area) }
-    fun setEnabled(id: Long, enabled: Boolean) = viewModelScope.launch { dao.setEnabled(id, enabled) }
+
+    fun setEnabled(id: Long, enabled: Boolean) =
+        viewModelScope.launch { dao.setEnabled(id, enabled) }
+
     fun delete(id: Long) = viewModelScope.launch { dao.delete(id) }
 }

@@ -1,6 +1,10 @@
 package org.osmwatch.changesetwatch.ui
 
 import android.app.Application
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -18,35 +22,41 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.AppDatabase
 import org.osmwatch.changesetwatch.data.ChangesetRepository
 import org.osmwatch.changesetwatch.data.ChangesetRow
 import org.osmwatch.changesetwatch.data.Prefs
 import org.osmwatch.changesetwatch.data.TokenStore
-import org.osmwatch.changesetwatch.network.OsmAuth
-import org.osmwatch.changesetwatch.network.OsmHttpException
-import android.content.Intent
-import android.net.Uri
-import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.WatchArea
 import org.osmwatch.changesetwatch.data.toRow
 import org.osmwatch.changesetwatch.domain.ChangeAction
 import org.osmwatch.changesetwatch.domain.ChangeGeometry
+import org.osmwatch.changesetwatch.domain.ChangeKind
+import org.osmwatch.changesetwatch.domain.ChangesetComment
 import org.osmwatch.changesetwatch.domain.ElementData
 import org.osmwatch.changesetwatch.domain.ElementDiff
 import org.osmwatch.changesetwatch.domain.ElementDiffer
+import org.osmwatch.changesetwatch.domain.ElementHistory
 import org.osmwatch.changesetwatch.domain.ElementRef
 import org.osmwatch.changesetwatch.domain.ElementType
+import org.osmwatch.changesetwatch.domain.ElementVersion
 import org.osmwatch.changesetwatch.domain.Flags
-import org.osmwatch.changesetwatch.domain.RowTags
 import org.osmwatch.changesetwatch.domain.GeometryResolver
 import org.osmwatch.changesetwatch.domain.LatLon
 import org.osmwatch.changesetwatch.domain.OsmChangeSummary
+import org.osmwatch.changesetwatch.domain.RowTags
+import org.osmwatch.changesetwatch.domain.UserActivity
+import org.osmwatch.changesetwatch.domain.UserActivityCalc
 import org.osmwatch.changesetwatch.domain.UserInfo
 import org.osmwatch.changesetwatch.domain.Verdict
 import org.osmwatch.changesetwatch.domain.VersionedId
+import org.osmwatch.changesetwatch.domain.attempt
+import org.osmwatch.changesetwatch.domain.reason
+import org.osmwatch.changesetwatch.network.OsmAuth
 import org.osmwatch.changesetwatch.network.OsmClient
 import org.osmwatch.changesetwatch.network.OsmElementSource
+import org.osmwatch.changesetwatch.network.OsmHttpException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
@@ -58,7 +68,10 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
 
     val areaFilter = MutableStateFlow<Long?>(null)
     val includeSeen = MutableStateFlow(true)
-    /** false (default): solo i changeset VERIFICATI dentro l'area; true: anche in attesa/incerti/troppo grandi/fuori. */
+    /**
+     * false (default): solo i changeset VERIFICATI dentro l'area; true: anche in
+     * attesa/incerti/troppo grandi/fuori.
+     */
     val showAll = MutableStateFlow(false)
     val onlyFlagged = MutableStateFlow(false)
     val hideTrusted = MutableStateFlow(false)
@@ -74,7 +87,9 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     val error = MutableStateFlow<String?>(null)
 
     val areas: StateFlow<List<WatchArea>> =
-        db.areaDao().observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        db.areaDao()
+            .observeAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Testo di ricerca: utente, commento, editor o id (filtro locale sulla lista). */
     val query = MutableStateFlow("")
@@ -82,21 +97,43 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     private val candidates: Flow<List<ChangesetRow>> =
         combine(areaFilter, includeSeen, showAll) { a, s, all -> Triple(a, s, all) }
             .flatMapLatest { (a, s, all) ->
-                val verdicts = if (all) Verdict.entries.map { it.name } else listOf(Verdict.CONFIRMED.name)
+                val verdicts =
+                    if (all) Verdict.entries.map { it.name } else listOf(Verdict.CONFIRMED.name)
                 db.changesetDao().observe(a, s, verdicts)
             }
             .combine(query) { rows, q ->
                 val t = q.trim()
-                if (t.isEmpty()) rows else rows.filter {
-                    it.id.toString().contains(t) || listOf(it.user, it.comment, it.createdBy).any { f -> f?.contains(t, ignoreCase = true) == true }
+                if (t.isEmpty()) rows
+                else
+                    rows.filter {
+                        it.id.toString().contains(t) ||
+                            listOf(it.user, it.comment, it.createdBy).any { f ->
+                                f?.contains(t, ignoreCase = true) == true
+                            }
+                    }
+            }
+            .let { base ->
+                combine(base, onlyFlagged, hideTrusted, suspectUsers, trustedUsers) {
+                    rows,
+                    f,
+                    h,
+                    s,
+                    t ->
+                    rows.filter { r ->
+                        (!f ||
+                            (Flags.header(r.changesCount, r.comment, r.user, s) +
+                                    Flags.fromCounts(
+                                        r.createdCount,
+                                        r.modifiedCount,
+                                        r.deletedCount,
+                                    ))
+                                .isNotEmpty()) && (!h || r.user !in t)
+                    }
                 }
             }
-            .let { base -> combine(base, onlyFlagged, hideTrusted, suspectUsers, trustedUsers) { rows, f, h, s, t ->
-                rows.filter { r ->
-                    (!f || (Flags.header(r.changesCount, r.comment, r.user, s) + Flags.fromCounts(r.createdCount, r.modifiedCount, r.deletedCount)).isNotEmpty()) && (!h || r.user !in t)
-                }
-            } }
-            .combine(minChanges) { rows, n -> if (n == 0) rows else rows.filter { (it.changesCount ?: 0) >= n } }
+            .combine(minChanges) { rows, n ->
+                if (n == 0) rows else rows.filter { (it.changesCount ?: 0) >= n }
+            }
             .combine(maxAgeHours) { rows, h ->
                 val from = System.currentTimeMillis() - h * 3_600_000L
                 if (h == 0) rows else rows.filter { it.createdAt >= from }
@@ -104,36 +141,62 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
 
     val editorFilter = MutableStateFlow<String?>(null)
     val hashtagFilter = MutableStateFlow<String?>(null)
-    val kindFilter = MutableStateFlow(org.osmwatch.changesetwatch.domain.ChangeKind.ANY)
+    val kindFilter = MutableStateFlow(ChangeKind.ANY)
 
-    /** Voci dei menu: calcolate prima di questi due filtri, così scegliere un editor non nasconde gli altri. */
-    val editors: StateFlow<List<String>> = candidates
-        .map { rows -> rows.mapNotNull { RowTags.editor(it.createdBy) }.distinct().sorted() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val hashtags: StateFlow<List<String>> = candidates
-        .map { rows -> rows.flatMap { RowTags.hashtags(it.comment) }.distinct().sorted() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /**
+     * Voci dei menu: calcolate prima di questi due filtri, così scegliere un editor non nasconde
+     * gli altri.
+     */
+    val editors: StateFlow<List<String>> =
+        candidates
+            .map { rows -> rows.mapNotNull { RowTags.editor(it.createdBy) }.distinct().sorted() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val hashtags: StateFlow<List<String>> =
+        candidates
+            .map { rows -> rows.flatMap { RowTags.hashtags(it.comment) }.distinct().sorted() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val changesets: StateFlow<List<ChangesetRow>> =
         combine(candidates, editorFilter, hashtagFilter, kindFilter) { rows, e, h, k ->
-            rows.filter {
-                (e == null || RowTags.editor(it.createdBy) == e) && (h == null || h in RowTags.hashtags(it.comment)) &&
-                    k.matches(it.createdCount, it.modifiedCount, it.deletedCount)
+                rows.filter {
+                    (e == null || RowTags.editor(it.createdBy) == e) &&
+                        (h == null || h in RowTags.hashtags(it.comment)) &&
+                        k.matches(it.createdCount, it.modifiedCount, it.deletedCount)
+                }
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Torna alla lista di default: solo changeset verificati nell'area, nessun altro filtro (area e ricerca restano). */
+    /**
+     * Torna alla lista di default: solo changeset verificati nell'area, nessun altro filtro (area e
+     * ricerca restano).
+     */
     fun resetFilters() {
-        includeSeen.value = true; showAll.value = false; onlyFlagged.value = false; hideTrusted.value = false
-        minChanges.value = 0; maxAgeHours.value = 0; editorFilter.value = null; hashtagFilter.value = null
-        kindFilter.value = org.osmwatch.changesetwatch.domain.ChangeKind.ANY
+        includeSeen.value = true
+        showAll.value = false
+        onlyFlagged.value = false
+        hideTrusted.value = false
+        minChanges.value = 0
+        maxAgeHours.value = 0
+        editorFilter.value = null
+        hashtagFilter.value = null
+        kindFilter.value = ChangeKind.ANY
     }
 
     /** Segui un utente da qualsiasi changeset; ignora i doppioni. */
     fun watchUser(name: String) {
         if (areas.value.any { it.watchUser == name }) return
         viewModelScope.launch {
-            db.areaDao().upsert(WatchArea(name = "@$name", minLat = 0.0, minLon = 0.0, maxLat = 0.0, maxLon = 0.0, watchUser = name))
+            db.areaDao()
+                .upsert(
+                    WatchArea(
+                        name = "@$name",
+                        minLat = 0.0,
+                        minLon = 0.0,
+                        maxLat = 0.0,
+                        maxLon = 0.0,
+                        watchUser = name,
+                    )
+                )
         }
     }
 
@@ -147,63 +210,83 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         prefs.trustedUsers = trustedUsers.value
     }
 
-    /** Changeset aperto da link esterno e non presente in lista: non salvato nel DB (areaId = EXTERNAL). */
+    /**
+     * Changeset aperto da link esterno e non presente in lista: non salvato nel DB (areaId =
+     * EXTERNAL).
+     */
     private val external = MutableStateFlow<Map<Long, ChangesetRow>>(emptyMap())
 
     fun observeOne(id: Long, areaId: Long): Flow<ChangesetRow?> =
-        if (areaId == EXTERNAL) external.map { it[id] } else db.changesetDao().observeOne(id, areaId)
+        if (areaId == EXTERNAL) external.map { it[id] }
+        else db.changesetDao().observeOne(id, areaId)
 
-    /** true (default): cerca solo tra i changeset delle aree; false: ricerca globale su OSM (utente esatto o id). */
+    /**
+     * true (default): cerca solo tra i changeset delle aree; false: ricerca globale su OSM (utente
+     * esatto o id).
+     */
     val areasOnly = MutableStateFlow(true)
     val globalResults = MutableStateFlow<List<ChangesetRow>>(emptyList())
     val searching = MutableStateFlow(false)
 
-    /** Ricerca globale: numero = id changeset, altrimenti nome utente OSM esatto (l'API non cerca nei commenti). Max 50. */
+    /**
+     * Ricerca globale: numero = id changeset, altrimenti nome utente OSM esatto (l'API non cerca
+     * nei commenti). Max 50.
+     */
     fun searchGlobal() {
         val q = query.value.trim()
         if (q.isEmpty() || searching.value) return
         viewModelScope.launch {
             searching.value = true
             error.value = null
-            try {
-                val found = withContext(Dispatchers.IO) {
-                    val id = q.removePrefix("#").toLongOrNull()
-                    if (id != null) listOfNotNull(client.fetchChangeset(id)) else client.fetchChangesetsByUser(q, 50)
+            attempt {
+                    val found =
+                        withContext(Dispatchers.IO) {
+                            val id = q.removePrefix("#").toLongOrNull()
+                            if (id != null) listOfNotNull(client.fetchChangeset(id))
+                            else client.fetchChangesetsByUser(q, 50)
+                        }
+                    val now = System.currentTimeMillis()
+                    val rows =
+                        found.map { it.toRow(EXTERNAL, Verdict.PENDING, now).copy(seen = true) }
+                    external.update { it + rows.associateBy { r -> r.id } }
+                    globalResults.value = rows
+                    if (rows.isEmpty()) error.value = "“$q”: not found"
                 }
-                val now = System.currentTimeMillis()
-                val rows = found.map { it.toRow(EXTERNAL, Verdict.PENDING, now).copy(seen = true) }
-                external.update { it + rows.associateBy { r -> r.id } }
-                globalResults.value = rows
-                if (rows.isEmpty()) error.value = "“$q”: not found"
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                error.value = "“$q”: ${e.message ?: e.javaClass.simpleName}"
-            } finally {
-                searching.value = false
-            }
+                .onFailure { error.value = "“$q”: ${it.reason}" }
+            searching.value = false
         }
     }
 
     /** Da richiesta di apertura (link) a [id, areaId] da mostrare; la UI lo consuma e lo azzera. */
     val openRequest = MutableStateFlow<List<Long>?>(null)
 
-    /** Link `.../changeset/ID`: usa la riga in DB se c'è, altrimenti scarica solo l'intestazione dall'API. */
+    /**
+     * Link `.../changeset/ID`: usa la riga in DB se c'è, altrimenti scarica solo l'intestazione
+     * dall'API.
+     */
     fun openLink(id: Long) {
         viewModelScope.launch {
             error.value = null
-            try {
-                val known = db.changesetDao().findAny(id)
-                if (known != null) { openRequest.value = listOf(id, known.areaId); return@launch }
-                val cs = withContext(Dispatchers.IO) { client.fetchChangeset(id) }
-                if (cs == null) { error.value = "#$id: not found"; return@launch }
-                external.update { it + (id to cs.toRow(EXTERNAL, Verdict.PENDING, System.currentTimeMillis()).copy(seen = true)) }
-                openRequest.value = listOf(id, EXTERNAL)
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                error.value = "#$id: ${e.message ?: e.javaClass.simpleName}"
-            }
+            attempt {
+                    val known = db.changesetDao().findAny(id)
+                    if (known != null) {
+                        openRequest.value = listOf(id, known.areaId)
+                        return@launch
+                    }
+                    val cs = withContext(Dispatchers.IO) { client.fetchChangeset(id) }
+                    if (cs == null) {
+                        error.value = "#$id: not found"
+                        return@launch
+                    }
+                    external.update {
+                        it +
+                            (id to
+                                cs.toRow(EXTERNAL, Verdict.PENDING, System.currentTimeMillis())
+                                    .copy(seen = true))
+                    }
+                    openRequest.value = listOf(id, EXTERNAL)
+                }
+                .onFailure { error.value = "#$id: ${it.reason}" }
         }
     }
 
@@ -211,23 +294,37 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     private val geoCache = HashMap<Long, GeoState>()
     val geoState = MutableStateFlow<GeoState>(GeoState.Loading)
 
-    /** Scarica osmChange + poche richieste (una alla volta) e ricostruisce la geometria. Oltre `maxChanges`: non scarica. */
+    /**
+     * Scarica osmChange + poche richieste (una alla volta) e ricostruisce la geometria. Oltre
+     * `maxChanges`: non scarica.
+     */
     fun loadGeometry(row: ChangesetRow) {
         diffState.value = null
-        geoCache[row.id]?.let { geoState.value = it; return }
-        if ((row.changesCount ?: 0) > prefs.maxChanges) { geoState.value = GeoState.TooLarge; return }
+        geoCache[row.id]?.let {
+            geoState.value = it
+            return
+        }
+        if ((row.changesCount ?: 0) > prefs.maxChanges) {
+            geoState.value = GeoState.TooLarge
+            return
+        }
         geoState.value = GeoState.Loading
         viewModelScope.launch {
-            val s = try {
-                withContext(Dispatchers.IO) {
-                    val change = client.fetchOsmChange(row.id)
-                    GeoState.Ready(GeometryResolver.resolve(change, OsmElementSource(client), includeBefore = true), change)
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                GeoState.Failed(e.message ?: e.javaClass.simpleName)
-            }
+            val s =
+                attempt {
+                        withContext(Dispatchers.IO) {
+                            val change = client.fetchOsmChange(row.id)
+                            GeoState.Ready(
+                                GeometryResolver.resolve(
+                                    change,
+                                    OsmElementSource(client),
+                                    includeBefore = true,
+                                ),
+                                change,
+                            )
+                        }
+                    }
+                    .getOrElse { GeoState.Failed(it.reason) }
             if (s is GeoState.Ready) geoCache[row.id] = s
             geoState.value = s
         }
@@ -239,23 +336,26 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     fun loadHistory(ref: ElementRef) {
         historyState.value = HistoryState.Loading(ref)
         viewModelScope.launch {
-            historyState.value = try {
-                val versions = withContext(Dispatchers.IO) { client.fetchHistory(ref.type, ref.id) }
-                HistoryState.Ready(ref, org.osmwatch.changesetwatch.domain.ElementHistory.diffs(ref, versions))
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                HistoryState.Failed(ref, e.message ?: e.javaClass.simpleName)
-            }
+            historyState.value =
+                attempt {
+                        val versions =
+                            withContext(Dispatchers.IO) { client.fetchHistory(ref.type, ref.id) }
+                        HistoryState.Ready(ref, ElementHistory.diffs(ref, versions))
+                    }
+                    .getOrElse { HistoryState.Failed(ref, it.reason) }
         }
     }
 
-    fun clearHistory() { historyState.value = null }
+    fun clearHistory() {
+        historyState.value = null
+    }
 
     // --- cosa è cambiato in un elemento toccato sulla mappa ---
     val diffState = MutableStateFlow<DiffState?>(null)
 
-    fun clearDiff() { diffState.value = null }
+    fun clearDiff() {
+        diffState.value = null
+    }
 
     /** Stato attuale dal osmChange + versione precedente (v-1, una richiesta) per il confronto. */
     fun loadDiff(ref: ElementRef) {
@@ -263,34 +363,60 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         val (action, current) = currentOf(change, ref) ?: return
         diffState.value = DiffState.Loading(ref)
         viewModelScope.launch {
-            diffState.value = try {
-                val previous = if (action != ChangeAction.CREATE && (ref.version ?: 0) > 1) {
-                    withContext(Dispatchers.IO) {
-                        OsmElementSource(client).details(ref.type, listOf(VersionedId(ref.id, ref.version!! - 1)))[ref.id]
+            diffState.value =
+                attempt {
+                        val previous =
+                            if (action != ChangeAction.CREATE && (ref.version ?: 0) > 1) {
+                                withContext(Dispatchers.IO) {
+                                    OsmElementSource(client)
+                                        .details(
+                                            ref.type,
+                                            listOf(VersionedId(ref.id, ref.version!! - 1)),
+                                        )[ref.id]
+                                }
+                            } else null
+                        DiffState.Ready(ElementDiffer.diff(ref, action, current, previous))
                     }
-                } else null
-                DiffState.Ready(ElementDiffer.diff(ref, action, current, previous))
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                DiffState.Failed(ref, e.message ?: e.javaClass.simpleName)
-            }
+                    .getOrElse { DiffState.Failed(ref, it.reason) }
         }
     }
 
-    private fun currentOf(change: OsmChangeSummary, ref: ElementRef): Pair<ChangeAction, ElementData?>? = when (ref.type) {
-        ElementType.NODE -> change.nodes.firstOrNull { it.id == ref.id }?.let {
-            it.action to if (it.action == ChangeAction.DELETE) null else ElementData(
-                if (it.lat != null && it.lon != null) LatLon(it.lat, it.lon) else null, emptyList(), it.tags,
-            )
+    private fun currentOf(
+        change: OsmChangeSummary,
+        ref: ElementRef,
+    ): Pair<ChangeAction, ElementData?>? =
+        when (ref.type) {
+            ElementType.NODE ->
+                change.nodes
+                    .firstOrNull { it.id == ref.id }
+                    ?.let {
+                        it.action to
+                            if (it.action == ChangeAction.DELETE) null
+                            else
+                                ElementData(
+                                    if (it.lat != null && it.lon != null) LatLon(it.lat, it.lon)
+                                    else null,
+                                    emptyList(),
+                                    it.tags,
+                                )
+                    }
+            ElementType.WAY ->
+                change.ways
+                    .firstOrNull { it.id == ref.id }
+                    ?.let {
+                        it.action to
+                            if (it.action == ChangeAction.DELETE) null
+                            else ElementData(null, it.nodeRefs, it.tags)
+                    }
+            ElementType.RELATION ->
+                change.relations
+                    .firstOrNull { it.id == ref.id }
+                    ?.let {
+                        it.action to
+                            if (it.action == ChangeAction.DELETE) null
+                            else ElementData(null, emptyList(), it.tags, it.members)
+                    }
         }
-        ElementType.WAY -> change.ways.firstOrNull { it.id == ref.id }?.let {
-            it.action to if (it.action == ChangeAction.DELETE) null else ElementData(null, it.nodeRefs, it.tags)
-        }
-        ElementType.RELATION -> change.relations.firstOrNull { it.id == ref.id }?.let {
-            it.action to if (it.action == ChangeAction.DELETE) null else ElementData(null, emptyList(), it.tags, it.members)
-        }
-    }
 
     // --- profilo dell'autore (pubblico) ---
     val userInfo = MutableStateFlow<UserInfo?>(null)
@@ -299,60 +425,64 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadUser(uid: Long?) {
         userFor = uid ?: 0L
-        if (uid == null) { userInfo.value = null; return }
-        if (userCache.containsKey(uid)) { userInfo.value = userCache[uid]; return }
+        if (uid == null) {
+            userInfo.value = null
+            return
+        }
+        if (userCache.containsKey(uid)) {
+            userInfo.value = userCache[uid]
+            return
+        }
         userInfo.value = null
         viewModelScope.launch {
-            try {
+            attempt { // se fallisce resta null: la scheda autore non mostra il profilo
                 val u = withContext(Dispatchers.IO) { client.fetchUser(uid) }
                 userCache[uid] = u
                 if (userFor == uid) userInfo.value = u
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) { /* resta null: niente profilo */ }
+            }
         }
     }
 
     // --- attività recente dell'autore (stile HDYC, solo su richiesta) ---
-    val activity = MutableStateFlow<org.osmwatch.changesetwatch.domain.UserActivity?>(null)
+    val activity = MutableStateFlow<UserActivity?>(null)
     val activityLoading = MutableStateFlow(false)
-    private val activityCache = HashMap<Long, org.osmwatch.changesetwatch.domain.UserActivity?>()
+    private val activityCache = HashMap<Long, UserActivity?>()
     private var activityFor = 0L
 
     fun loadActivity(uid: Long) {
         activityFor = uid
-        if (activityCache.containsKey(uid)) { activity.value = activityCache[uid]; activityLoading.value = false; return }
+        if (activityCache.containsKey(uid)) {
+            activity.value = activityCache[uid]
+            activityLoading.value = false
+            return
+        }
         activity.value = null
         activityLoading.value = true
         viewModelScope.launch {
-            try {
+            attempt { // se fallisce resta null: la sezione mostra "non disponibile"
                 val list = withContext(Dispatchers.IO) { client.fetchChangesetsByUid(uid, 100) }
                 val areaBoxes = areas.value.filter { it.watchUser == null }.map { it.bbox }
-                val a = org.osmwatch.changesetwatch.domain.UserActivityCalc.of(list, areaBoxes)
+                val a = UserActivityCalc.of(list, areaBoxes)
                 activityCache[uid] = a
                 if (activityFor == uid) activity.value = a
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) { /* resta null: la sezione mostra "non disponibile" */ }
-            finally { if (activityFor == uid) activityLoading.value = false }
+            }
+            if (activityFor == uid) activityLoading.value = false
         }
     }
 
     // --- discussione del changeset (pubblica, senza login) ---
     /** null = in caricamento o non disponibile. */
-    val discussion = MutableStateFlow<List<org.osmwatch.changesetwatch.domain.ChangesetComment>?>(null)
+    val discussion = MutableStateFlow<List<ChangesetComment>?>(null)
     private var discussionFor = 0L
 
     fun loadDiscussion(id: Long) {
         if (discussionFor != id) discussion.value = null
         discussionFor = id
         viewModelScope.launch {
-            try {
+            attempt { // se fallisce resta null: la sezione commenti non compare
                 val list = withContext(Dispatchers.IO) { client.fetchDiscussion(id) }
                 if (discussionFor == id) discussion.value = list
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) { /* resta null: la sezione commenti non compare */ }
+            }
         }
     }
 
@@ -360,87 +490,107 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     val loggedIn = MutableStateFlow(tokens.token != null)
     val commentState = MutableStateFlow<CommentState>(CommentState.Idle)
     private val authHttp = OsmClient.defaultHttp()
+
     private fun str(id: Int) = getApplication<Application>().getString(id)
 
-    /** Intent per il browser: apre la pagina di autorizzazione OSM; il ritorno arriva a [handleOAuth]. */
+    /**
+     * Intent per il browser: apre la pagina di autorizzazione OSM; il ritorno arriva a
+     * [handleOAuth].
+     */
     fun loginIntent(): Intent {
         val verifier = OsmAuth.randomToken()
         val state = OsmAuth.randomToken()
         prefs.pendingVerifier = verifier
         prefs.pendingState = state
-        return Intent(Intent.ACTION_VIEW, Uri.parse(OsmAuth.authorizeUrl(OsmAuth.challenge(verifier), state)))
+        return Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse(OsmAuth.authorizeUrl(OsmAuth.challenge(verifier), state)),
+        )
     }
 
     private fun loginFailed(detail: String) {
-        android.util.Log.w("OsmLogin", detail)
+        Log.w("OsmLogin", detail)
         val msg = "${str(R.string.login_failed)}: $detail"
         error.value = msg
-        android.widget.Toast.makeText(getApplication(), msg, android.widget.Toast.LENGTH_LONG).show()
+        Toast.makeText(getApplication(), msg, Toast.LENGTH_LONG).show()
     }
 
     fun handleOAuth(uri: Uri) {
-        android.util.Log.i("OsmLogin", "redirect: ${uri.scheme}://${uri.host} error=${uri.getQueryParameter("error")} hasCode=${uri.getQueryParameter("code") != null}")
         val verifier = prefs.pendingVerifier
         val ok = verifier != null && uri.getQueryParameter("state") == prefs.pendingState
-        prefs.pendingVerifier = null; prefs.pendingState = null
+        prefs.pendingVerifier = null
+        prefs.pendingState = null
         val code = uri.getQueryParameter("code")
         if (!ok || code == null) {
-            loginFailed(uri.getQueryParameter("error_description") ?: uri.getQueryParameter("error") ?: if (verifier == null) "no pending login" else "state mismatch")
+            loginFailed(
+                uri.getQueryParameter("error_description")
+                    ?: uri.getQueryParameter("error")
+                    ?: if (verifier == null) "no pending login" else "state mismatch"
+            )
             return
         }
         viewModelScope.launch {
-            try {
-                val token = withContext(Dispatchers.IO) { OsmAuth.exchange(authHttp, code, verifier!!) }
-                tokens.token = token
-                loggedIn.value = true
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                loginFailed(e.message ?: e.javaClass.simpleName)
-            }
+            attempt {
+                    tokens.token =
+                        withContext(Dispatchers.IO) { OsmAuth.exchange(authHttp, code, verifier!!) }
+                    loggedIn.value = true
+                }
+                .onFailure { loginFailed(it.reason) }
         }
     }
 
-    fun logout() { tokens.token = null; loggedIn.value = false }
+    fun logout() {
+        tokens.token = null
+        loggedIn.value = false
+    }
 
     fun sendComment(changesetId: Long, text: String) {
-        val token = tokens.token ?: run { loggedIn.value = false; return }
+        val token =
+            tokens.token
+                ?: run {
+                    loggedIn.value = false
+                    return
+                }
         if (commentState.value is CommentState.Sending) return
         commentState.value = CommentState.Sending
         viewModelScope.launch {
-            commentState.value = try {
-                withContext(Dispatchers.IO) { OsmAuth.postComment(authHttp, token, changesetId, text.trim()) }
-                loadDiscussion(changesetId)
-                CommentState.Done
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: OsmHttpException) {
-                if (e.code == 401) logout()
-                CommentState.Error(when (e.code) {
-                    401 -> str(R.string.comment_err_auth)
-                    409 -> str(R.string.comment_err_closed)
-                    429 -> str(R.string.comment_err_rate)
-                    else -> e.message ?: "HTTP ${e.code}"
-                })
-            } catch (e: Exception) {
-                CommentState.Error(e.message ?: e.javaClass.simpleName)
-            }
+            commentState.value =
+                attempt {
+                        withContext(Dispatchers.IO) {
+                            OsmAuth.postComment(authHttp, token, changesetId, text.trim())
+                        }
+                        loadDiscussion(changesetId)
+                        CommentState.Done
+                    }
+                    .getOrElse { e ->
+                        if (e is OsmHttpException && e.code == 401) logout()
+                        CommentState.Error(
+                            when ((e as? OsmHttpException)?.code) {
+                                401 -> str(R.string.comment_err_auth)
+                                409 -> str(R.string.comment_err_closed)
+                                429 -> str(R.string.comment_err_rate)
+                                else -> e.reason
+                            }
+                        )
+                    }
         }
     }
 
-    fun resetComment() { commentState.value = CommentState.Idle }
+    fun resetComment() {
+        commentState.value = CommentState.Idle
+    }
 
-    fun markSeen(id: Long, areaId: Long) = viewModelScope.launch { db.changesetDao().markSeen(id, areaId) }
+    fun markSeen(id: Long, areaId: Long) =
+        viewModelScope.launch { db.changesetDao().markSeen(id, areaId) }
 
-    /**
-     * Scarica gli ultimi 100 changeset per ogni area abilitata, anche precedenti alla creazione dell'area, e li verifica
-     * (dentro l'area davvero?). Aree una alla volta con pausa di 1 s (rate limit). I duplicati sono ignorati dal DB.
-     */
     val loadingMore = MutableStateFlow(false)
     /** Esito dell'ultimo "Carica altri" (testo già pronto), null finché non lo premi. */
     val loadMoreResult = MutableStateFlow<String?>(null)
 
-    /** Pagina più vecchia per l'area scelta, o per tutte le aree abilitate; una alla volta, 1 s di pausa. */
+    /**
+     * Pagina più vecchia per l'area scelta, o per tutte le aree abilitate; una alla volta, 1 s di
+     * pausa.
+     */
     fun loadMore() {
         if (loadingMore.value || refreshing.value) return
         viewModelScope.launch {
@@ -452,21 +602,23 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
             val failures = mutableListOf<String>()
             try {
                 val all = db.areaDao().observeAll().first()
-                val targets = areaFilter.value?.let { id -> all.filter { it.id == id } } ?: all.filter { it.enabled }
+                val targets =
+                    areaFilter.value?.let { id -> all.filter { it.id == id } }
+                        ?: all.filter { it.enabled }
                 targets.forEachIndexed { i, area ->
                     if (i > 0) delay(1_000)
-                    try {
-                        val r = repo.loadOlder(area) { done, total -> progress.value = if (total > 0) "${area.name}: $done/$total" else null }
-                        fetched += r.fetched; confirmed += r.confirmed
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        failures += "${area.name}: ${e.message ?: e.javaClass.simpleName}"
-                    }
+                    attempt { repo.loadOlder(area, progressFor(area)) }
+                        .onSuccess {
+                            fetched += it.fetched
+                            confirmed += it.confirmed
+                        }
+                        .onFailure { failures += "${area.name}: ${it.reason}" }
                 }
                 val res = getApplication<Application>().resources
-                loadMoreResult.value = if (fetched == 0) res.getString(R.string.load_more_none)
-                else res.getQuantityString(R.plurals.load_more_done, fetched, fetched, confirmed)
+                loadMoreResult.value =
+                    if (fetched == 0) res.getString(R.string.load_more_none)
+                    else
+                        res.getQuantityString(R.plurals.load_more_done, fetched, fetched, confirmed)
             } finally {
                 progress.value = null
                 error.update { failures.takeIf { it.isNotEmpty() }?.joinToString("\n") }
@@ -475,6 +627,14 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun progressFor(area: WatchArea): (Int, Int) -> Unit = { done, total ->
+        progress.value = if (total > 0) "${area.name}: $done/$total" else null
+    }
+
+    /**
+     * Scarica gli ultimi changeset di ogni area abilitata e li verifica (dentro l'area davvero?).
+     * Aree una alla volta con pausa di 1 s (rate limit); i duplicati sono ignorati dal DB.
+     */
     fun refresh() {
         if (refreshing.value) return
         viewModelScope.launch {
@@ -485,13 +645,8 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
                 val enabled = db.areaDao().observeAll().first().filter { it.enabled }
                 enabled.forEachIndexed { i, area ->
                     if (i > 0) delay(1_000)
-                    try {
-                        repo.refreshLatest(area) { done, total -> progress.value = if (total > 0) "${area.name}: $done/$total" else null }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        failures += "${area.name}: ${e.message ?: e.javaClass.simpleName}"
-                    }
+                    attempt { repo.refreshLatest(area, progressFor(area)) }
+                        .onFailure { failures += "${area.name}: ${it.reason}" }
                 }
             } finally {
                 progress.value = null
@@ -510,30 +665,41 @@ val MAX_AGE_STEPS = listOf(0, 24, 168) // ore: tutto, 24 h, 7 giorni
 
 sealed interface GeoState {
     data object Loading : GeoState
+
     data object TooLarge : GeoState
+
     data class Failed(val message: String) : GeoState
+
     data class Ready(val geometry: ChangeGeometry, val change: OsmChangeSummary) : GeoState
 }
 
 sealed interface DiffState {
     data class Loading(val ref: ElementRef) : DiffState
+
     data class Failed(val ref: ElementRef, val message: String) : DiffState
+
     data class Ready(val diff: ElementDiff) : DiffState
 }
 
 sealed interface CommentState {
     data object Idle : CommentState
+
     data object Sending : CommentState
+
     data object Done : CommentState
+
     data class Error(val message: String) : CommentState
 }
 
 sealed interface HistoryState {
     val ref: ElementRef
+
     data class Loading(override val ref: ElementRef) : HistoryState
+
     data class Failed(override val ref: ElementRef, val message: String) : HistoryState
+
     data class Ready(
         override val ref: ElementRef,
-        val versions: List<Pair<org.osmwatch.changesetwatch.domain.ElementVersion, org.osmwatch.changesetwatch.domain.ElementDiff>>,
+        val versions: List<Pair<ElementVersion, ElementDiff>>,
     ) : HistoryState
 }

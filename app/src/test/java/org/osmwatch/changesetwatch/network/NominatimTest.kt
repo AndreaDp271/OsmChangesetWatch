@@ -5,8 +5,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NominatimTest {
-    // risposta reale ridotta: confine comunale + punto del centro abitato con lo stesso nome, poi una provincia
-    private val xml = """<?xml version="1.0" encoding="UTF-8" ?><searchresults>
+    // risposta reale ridotta: confine comunale + punto del centro abitato con lo stesso nome, poi
+    // una provincia
+    private val xml =
+        """<?xml version="1.0" encoding="UTF-8" ?><searchresults>
         <place osm_type="node" osm_id="64778671" boundingbox="45.6312889,45.7112889,11.8861510,11.9661510" place_rank="18"
           display_name="Castelfranco Veneto, Fonte, Treviso, Veneto, 31033, Italia" class="place" type="town" geotext="POINT(11.92 45.67)"/>
         <place osm_type="relation" osm_id="45549" boundingbox="45.6130550,45.7078612,11.8677727,11.9970766" place_rank="16"
@@ -17,7 +19,8 @@ class NominatimTest {
           geotext="MULTIPOLYGON(((11.7 42.1,11.8 42.1,11.8 42.2,11.7 42.1)),((12.0 41.5,12.1 41.5,12.1 41.6,12.0 41.5)))"/>
         </searchresults>"""
 
-    @Test fun boundaryWinsAndBboxOrderIsConverted() {
+    @Test
+    fun boundaryWinsAndBboxOrderIsConverted() {
         val r = Nominatim.parse(xml.byteInputStream())
         assertEquals(2, r.size)
         val c = r[0]
@@ -34,7 +37,8 @@ class NominatimTest {
         assertEquals(2, r[1].outline.size)
     }
 
-    @Test fun pointHasNoOutline() {
+    @Test
+    fun pointHasNoOutline() {
         assertTrue(Nominatim.rings("POINT(11.92 45.67)").isEmpty())
     }
 }

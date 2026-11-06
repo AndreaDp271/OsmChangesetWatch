@@ -9,7 +9,10 @@ import org.osmwatch.changesetwatch.domain.Member
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 
-/** Risposta di `GET /{node|way|relation}/ID/history`: tutte le versioni, nell'ordine del server (dalla prima). */
+/**
+ * Risposta di `GET /{node|way|relation}/ID/history`: tutte le versioni, nell'ordine del server
+ * (dalla prima).
+ */
 object HistoryParser {
     fun parse(input: InputStream): List<ElementVersion> {
         val p = XmlPullParserFactory.newInstance().newPullParser()
@@ -30,24 +33,37 @@ object HistoryParser {
             fun a(n: String) = p.getAttributeValue(null, n)
             when (p.name) {
                 in TYPES -> {
-                    head = ElementVersion(
-                        version = a("version")?.toIntOrNull() ?: 0,
-                        changeset = a("changeset")?.toLongOrNull(),
-                        user = a("user"),
-                        timestamp = a("timestamp")?.let { runCatching { Instant.parse(it) }.getOrNull() },
-                        visible = a("visible") != "false",
-                        data = ElementData(null, emptyList(), emptyMap()),
-                    )
-                    val lat = a("lat")?.toDoubleOrNull(); val lon = a("lon")?.toDoubleOrNull()
+                    head =
+                        ElementVersion(
+                            version = a("version")?.toIntOrNull() ?: 0,
+                            changeset = a("changeset")?.toLongOrNull(),
+                            user = a("user"),
+                            timestamp =
+                                a("timestamp")?.let {
+                                    runCatching { Instant.parse(it) }.getOrNull()
+                                },
+                            visible = a("visible") != "false",
+                            data = ElementData(null, emptyList(), emptyMap()),
+                        )
+                    val lat = a("lat")?.toDoubleOrNull()
+                    val lon = a("lon")?.toDoubleOrNull()
                     at = if (lat != null && lon != null) LatLon(lat, lon) else null
-                    refs = mutableListOf(); members = mutableListOf(); tags = mutableMapOf()
+                    refs = mutableListOf()
+                    members = mutableListOf()
+                    tags = mutableMapOf()
                 }
                 "nd" -> if (head != null) a("ref")?.toLongOrNull()?.let { refs += it }
-                "member" -> if (head != null) a("ref")?.toLongOrNull()?.let { members += Member(a("type") ?: "", it, a("role") ?: "") }
-                "tag" -> if (head != null) {
-                    val k = a("k"); val v = a("v")
-                    if (k != null && v != null) tags[k] = v
-                }
+                "member" ->
+                    if (head != null)
+                        a("ref")?.toLongOrNull()?.let {
+                            members += Member(a("type") ?: "", it, a("role") ?: "")
+                        }
+                "tag" ->
+                    if (head != null) {
+                        val k = a("k")
+                        val v = a("v")
+                        if (k != null && v != null) tags[k] = v
+                    }
             }
         }
         return out

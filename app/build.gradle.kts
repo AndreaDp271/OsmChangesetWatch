@@ -15,21 +15,29 @@ android {
         targetSdk = 35
         versionCode = 100
         versionName = "1.0.0"
+        // aggiornamenti da GitHub dentro l'app; F-Droid aggiorna da sé: lì si compila con
+        // -PnoUpdater
+        buildConfigField("boolean", "UPDATER", (!project.hasProperty("noUpdater")).toString())
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // firma solo se le variabili d'ambiente sono presenti (mai segreti nel repo); F-Droid firma con la propria chiave
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            // firma solo se le variabili d'ambiente sono presenti (mai segreti nel repo); F-Droid
+            // firma con la propria chiave
             System.getenv("OSMWATCH_KEYSTORE")?.let { ks ->
-                signingConfig = signingConfigs.create("release") {
-                    storeFile = file(ks)
-                    storePassword = System.getenv("OSMWATCH_KEYSTORE_PASSWORD")
-                    keyAlias = System.getenv("OSMWATCH_KEY_ALIAS")
-                    keyPassword = System.getenv("OSMWATCH_KEY_PASSWORD")
-                }
+                signingConfig =
+                    signingConfigs.create("release") {
+                        storeFile = file(ks)
+                        storePassword = System.getenv("OSMWATCH_KEYSTORE_PASSWORD")
+                        keyAlias = System.getenv("OSMWATCH_KEY_ALIAS")
+                        keyPassword = System.getenv("OSMWATCH_KEY_PASSWORD")
+                    }
             }
         }
     }
@@ -37,11 +45,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlinOptions { jvmTarget = "17" }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     // F-Droid: niente blocco di dipendenze cifrato (binario opaco)
     dependenciesInfo {
@@ -54,7 +61,8 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
-    implementation(libs.compose.icons.extended) // stesse icone di ParkMap; R8 in release elimina quelle non usate
+    // stesse icone di ParkMap; R8 in release elimina quelle non usate
+    implementation(libs.compose.icons.extended)
     implementation(libs.androidx.activity.compose)
     implementation(libs.okhttp)
     implementation(libs.osmdroid)

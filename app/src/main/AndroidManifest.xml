@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- aggiornamenti scaricati dalle release di GitHub -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -38,5 +40,8 @@
                 <data android:scheme="io.github.andreadp271.osmwatch" android:host="oauth" />
             </intent-filter>
         </activity>
+        <receiver
+            android:name=".network.UpdateReceiver"
+            android:exported="false" />
     </application>
 </manifest>

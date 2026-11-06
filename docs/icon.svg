@@ -1,4 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 108 108">
   <rect width="108" height="108" rx="26" fill="#2563EB"/>
-  <path fill="#FFFFFF" fill-rule="evenodd" d="M54,26c-11.6,0 -21,9.4 -21,21c0,15.5 21,36 21,36s21,-20.5 21,-36c0,-11.6 -9.4,-21 -21,-21zM54,38.5a8.5,8.5 0 1,0 0.01,0z"/>
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="3" stroke-dasharray="3 4" opacity=".7" d="M44,52 L58,38 L82,34"/>
+    <circle stroke-width="3" stroke-dasharray="3 3" opacity=".75" cx="58" cy="38" r="6"/>
+    <path stroke-width="5" d="M26,72 L44,52 L64,62 L82,34"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="26" cy="72" r="5.5"/><circle cx="44" cy="52" r="5.5"/><circle cx="82" cy="34" r="5.5"/>
+  </g>
+  <circle cx="64" cy="62" r="7" fill="#EA580C"/>
 </svg>

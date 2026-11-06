@@ -14,10 +14,11 @@ import org.osmwatch.changesetwatch.domain.ChangesetComment
 import org.osmwatch.changesetwatch.domain.ElementData
 import org.osmwatch.changesetwatch.domain.ElementSource
 import org.osmwatch.changesetwatch.domain.ElementType
+import org.osmwatch.changesetwatch.domain.ElementVersion
 import org.osmwatch.changesetwatch.domain.LatLon
+import org.osmwatch.changesetwatch.domain.OsmChangeSummary
 import org.osmwatch.changesetwatch.domain.UserInfo
 import org.osmwatch.changesetwatch.domain.VersionedId
-import org.osmwatch.changesetwatch.domain.OsmChangeSummary
 
 class OsmHttpException(val code: Int, message: String) : IOException(message)
 
@@ -33,28 +34,51 @@ class OsmClient(
      * `closedAfter` = `time=T1`: chiusi dopo T1 O ancora aperti (cattura anche i changeset lunghi).
      * `createdBefore` = `time=T1,T2` (T2 usato per la paginazione); ignorato senza `closedAfter`.
      */
-    fun fetchChangesets(bbox: BBox, closedAfter: Instant? = null, createdBefore: Instant? = null, limit: Int = 100): List<Changeset> {
-        val url = "$baseUrl/changesets".toHttpUrl().newBuilder()
-            .addQueryParameter("bbox", bbox.toApiParam())
-            .addQueryParameter("limit", limit.toString())
-            .apply {
-                if (closedAfter != null) {
-                    addQueryParameter("time", if (createdBefore != null) "$closedAfter,$createdBefore" else closedAfter.toString())
+    fun fetchChangesets(
+        bbox: BBox,
+        closedAfter: Instant? = null,
+        createdBefore: Instant? = null,
+        limit: Int = 100,
+    ): List<Changeset> {
+        val url =
+            "$baseUrl/changesets"
+                .toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("bbox", bbox.toApiParam())
+                .addQueryParameter("limit", limit.toString())
+                .apply {
+                    if (closedAfter != null) {
+                        addQueryParameter(
+                            "time",
+                            if (createdBefore != null) "$closedAfter,$createdBefore"
+                            else closedAfter.toString(),
+                        )
+                    }
                 }
-            }
-            .build()
+                .build()
         return execute(url) { ChangesetParser.parse(it.body!!.byteStream()) }
     }
 
     fun fetchChangeset(id: Long): Changeset? =
-        execute("$baseUrl/changeset/$id".toHttpUrl()) { ChangesetParser.parse(it.body!!.byteStream()).firstOrNull() }
+        execute("$baseUrl/changeset/$id".toHttpUrl()) {
+            ChangesetParser.parse(it.body!!.byteStream()).firstOrNull()
+        }
 
     fun fetchDiscussion(id: Long): List<ChangesetComment> =
-        execute("$baseUrl/changeset/$id".toHttpUrl().newBuilder().addQueryParameter("include_discussion", "true").build()) {
+        execute(
+            "$baseUrl/changeset/$id"
+                .toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("include_discussion", "true")
+                .build()
+        ) {
             DiscussionParser.parse(it.body!!.byteStream())
         }
 
-    /** Profilo pubblico dell'utente (nessun login); null se l'utente non esiste più o è anonimizzato. */
+    /**
+     * Profilo pubblico dell'utente (nessun login); null se l'utente non esiste più o è
+     * anonimizzato.
+     */
     fun fetchUser(uid: Long): UserInfo? =
         try {
             execute("$baseUrl/user/$uid".toHttpUrl()) { UserParser.parse(it.body!!.byteStream()) }
@@ -62,26 +86,53 @@ class OsmClient(
             if (e.code == 404 || e.code == 410) null else throw e
         }
 
-    /** [closedAfter]: solo chiusi dopo T1 o ancora aperti (`time=T1`); con [createdBefore] anche creati prima di T2 (`time=T1,T2`). */
-    fun fetchChangesetsByUser(displayName: String, limit: Int = 50, closedAfter: Instant? = null, createdBefore: Instant? = null): List<Changeset> =
-        execute("$baseUrl/changesets".toHttpUrl().newBuilder()
-            .addQueryParameter("display_name", displayName).addQueryParameter("limit", limit.toString())
-            .apply {
-                if (closedAfter != null) addQueryParameter("time", if (createdBefore != null) "$closedAfter,$createdBefore" else closedAfter.toString())
-            }.build()) {
+    /**
+     * [closedAfter]: solo chiusi dopo T1 o ancora aperti (`time=T1`); con [createdBefore] anche
+     * creati prima di T2 (`time=T1,T2`).
+     */
+    fun fetchChangesetsByUser(
+        displayName: String,
+        limit: Int = 50,
+        closedAfter: Instant? = null,
+        createdBefore: Instant? = null,
+    ): List<Changeset> =
+        execute(
+            "$baseUrl/changesets"
+                .toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("display_name", displayName)
+                .addQueryParameter("limit", limit.toString())
+                .apply {
+                    if (closedAfter != null)
+                        addQueryParameter(
+                            "time",
+                            if (createdBefore != null) "$closedAfter,$createdBefore"
+                            else closedAfter.toString(),
+                        )
+                }
+                .build()
+        ) {
             ChangesetParser.parse(it.body!!.byteStream())
         }
 
     /** Ultimi changeset dell'utente per id numerico (stabile anche se cambia nome). */
     fun fetchChangesetsByUid(uid: Long, limit: Int = 100): List<Changeset> =
-        execute("$baseUrl/changesets".toHttpUrl().newBuilder()
-            .addQueryParameter("user", uid.toString()).addQueryParameter("limit", limit.toString()).build()) {
+        execute(
+            "$baseUrl/changesets"
+                .toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("user", uid.toString())
+                .addQueryParameter("limit", limit.toString())
+                .build()
+        ) {
             ChangesetParser.parse(it.body!!.byteStream())
         }
 
     /** Tutte le versioni di un elemento (anche quelle cancellate). */
-    fun fetchHistory(type: ElementType, id: Long): List<org.osmwatch.changesetwatch.domain.ElementVersion> =
-        execute("$baseUrl/${type.name.lowercase()}/$id/history".toHttpUrl()) { HistoryParser.parse(it.body!!.byteStream()) }
+    fun fetchHistory(type: ElementType, id: Long): List<ElementVersion> =
+        execute("$baseUrl/${type.name.lowercase()}/$id/history".toHttpUrl()) {
+            HistoryParser.parse(it.body!!.byteStream())
+        }
 
     fun fetchOsmChange(changesetId: Long): OsmChangeSummary =
         execute("$baseUrl/changeset/$changesetId/download".toHttpUrl()) {
@@ -89,7 +140,10 @@ class OsmClient(
         }
 
     fun fetchElements(kind: String, ids: List<VersionedId>): Elements {
-        val param = ids.joinToString(",") { if (it.version != null) "${it.id}v${it.version}" else "${it.id}" }
+        val param =
+            ids.joinToString(",") {
+                if (it.version != null) "${it.id}v${it.version}" else "${it.id}"
+            }
         val url = "$baseUrl/$kind".toHttpUrl().newBuilder().addQueryParameter(kind, param).build()
         return execute(url) { MultiFetchParser.parse(it.body!!.byteStream()) }
     }
@@ -103,10 +157,15 @@ class OsmClient(
                     when {
                         r.isSuccessful -> return parse(r)
                         r.code == 429 || r.code >= 500 -> {
-                            if (attempt >= OsmConfig.MAX_RETRIES) throw OsmHttpException(r.code, "HTTP ${r.code} dopo $attempt retry")
+                            if (attempt >= OsmConfig.MAX_RETRIES)
+                                throw OsmHttpException(r.code, "HTTP ${r.code} dopo $attempt retry")
                             sleep(backoffMs(attempt, r.header("Retry-After")))
                         }
-                        else -> throw OsmHttpException(r.code, "HTTP ${r.code}: ${r.body?.string()?.take(200)}")
+                        else ->
+                            throw OsmHttpException(
+                                r.code,
+                                "HTTP ${r.code}: ${r.body?.string()?.take(200)}",
+                            )
                     }
                 }
             } catch (e: OsmHttpException) {
@@ -120,23 +179,29 @@ class OsmClient(
     }
 
     companion object {
-        /** Retry-After in secondi (shortcut: la forma "data HTTP" non è gestita, si usa l'esponenziale). */
+        /**
+         * Retry-After in secondi (shortcut: la forma "data HTTP" non è gestita, si usa
+         * l'esponenziale).
+         */
         fun backoffMs(attempt: Int, retryAfter: String?): Long =
             retryAfter?.trim()?.toLongOrNull()?.let { it.coerceIn(0, 300) * 1000 }
                 ?: (1000L shl attempt.coerceAtMost(6))
 
-        fun defaultHttp(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(OsmConfig.CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
-            .readTimeout(OsmConfig.READ_TIMEOUT_S, TimeUnit.SECONDS)
-            .build()
+        fun defaultHttp(): OkHttpClient =
+            OkHttpClient.Builder()
+                .connectTimeout(OsmConfig.CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
+                .readTimeout(OsmConfig.READ_TIMEOUT_S, TimeUnit.SECONDS)
+                .build()
     }
 }
 
 /**
- * Multi fetch (`/nodes?nodes=123v2,456`, `/ways?ways=...`), a blocchi di 100 id, con pausa tra le richieste.
- * Un 404 (elemento redatto) salta il blocco: il risultato resta parziale invece di fallire.
+ * Multi fetch (`/nodes?nodes=123v2,456`, `/ways?ways=...`), a blocchi di 100 id, con pausa tra le
+ * richieste. Un 404 (elemento redatto) salta il blocco: il risultato resta parziale invece di
+ * fallire.
  */
-class OsmElementSource(private val client: OsmClient, private val pauseMs: Long = 500) : ElementSource {
+class OsmElementSource(private val client: OsmClient, private val pauseMs: Long = 500) :
+    ElementSource {
     override fun nodes(ids: List<VersionedId>): Map<Long, LatLon> =
         details(ElementType.NODE, ids).mapNotNull { (k, v) -> v.at?.let { k to it } }.toMap()
 
@@ -144,7 +209,12 @@ class OsmElementSource(private val client: OsmClient, private val pauseMs: Long 
         details(ElementType.WAY, ids).mapValues { it.value.refs }
 
     override fun details(type: ElementType, ids: List<VersionedId>): Map<Long, ElementData> {
-        val kind = when (type) { ElementType.NODE -> "nodes"; ElementType.WAY -> "ways"; ElementType.RELATION -> "relations" }
+        val kind =
+            when (type) {
+                ElementType.NODE -> "nodes"
+                ElementType.WAY -> "ways"
+                ElementType.RELATION -> "relations"
+            }
         val out = HashMap<Long, ElementData>()
         ids.chunked(100).forEachIndexed { i, chunk ->
             if (i > 0) Thread.sleep(pauseMs)
