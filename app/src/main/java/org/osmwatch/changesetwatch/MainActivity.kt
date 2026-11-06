@@ -121,7 +121,7 @@ private fun AppRoot(cvm: ChangesetsViewModel, vm: AreasViewModel = viewModel()) 
         val searching by cvm.searching.collectAsState()
         ChangesetsScreen(
             query = query, onQuery = { cvm.query.value = it },
-            areasOnly = areasOnly, onAreasOnly = { cvm.areasOnly.value = it }, onSearch = cvm::searchGlobal,
+            areasOnly = areasOnly, onAreasOnly = { cvm.areasOnly.value = it }, onSearch = { if (!areasOnly) cvm.searchGlobal() },
             rows = if (areasOnly) rows else global, areas = allAreas, areaFilter = filter, includeSeen = seen, showAll = showAll, progress = progress,
             refreshing = refreshing || searching, error = error,
             onAreaFilter = { cvm.areaFilter.value = it }, onIncludeSeen = { cvm.includeSeen.value = it }, onShowAll = { cvm.showAll.value = it },
