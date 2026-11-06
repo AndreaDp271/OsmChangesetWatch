@@ -34,4 +34,5 @@
     <string name="open_osmcha">Apri in OSMCha</string>
     <string name="mark_seen">Segna come visto</string>
     <string name="seen">Visto</string>
+    <string name="refresh">Aggiorna</string>
 </resources>
