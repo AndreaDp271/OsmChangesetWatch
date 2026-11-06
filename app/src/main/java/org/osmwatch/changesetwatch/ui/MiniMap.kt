@@ -26,6 +26,8 @@ import org.osmwatch.changesetwatch.domain.BBox
 import org.osmwatch.changesetwatch.domain.ChangeAction
 import org.osmwatch.changesetwatch.domain.ChangeGeometry
 import org.osmwatch.changesetwatch.domain.DrawPoint
+import org.osmwatch.changesetwatch.domain.ElementRef
+import kotlin.math.hypot
 import kotlin.math.max
 
 /** Colori e tratti per azione: nuovo = verde pieno, modificato = arancione, eliminato = rosso tratteggiato. */
@@ -56,7 +58,8 @@ private class PointsOverlay(private val points: List<DrawPoint>, private val den
 
 /** Minimappa non invasiva: mostra i cambiamenti (o, se non ricostruibili, la bbox del changeset) e si adatta all'area. */
 @Composable
-fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, modifier: Modifier = Modifier) {
+fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, onElementTap: (ElementRef) -> Unit, modifier: Modifier = Modifier) {
+    val tapState = androidx.compose.runtime.rememberUpdatedState(onElementTap)
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val map = remember {
@@ -90,6 +93,7 @@ fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, modifier: Modifier = Mod
             })
         }
         geometry?.points?.takeIf { it.isNotEmpty() }?.let { m.overlays.add(PointsOverlay(it, d)) }
+        if (geometry != null && !geometry.isEmpty) m.overlays.add(TapOverlay(geometry, d) { tapState.value(it) })
         val pts = geometry?.allPoints().orEmpty().map { GeoPoint(it.lat, it.lon) }
         m.post {
             val box = when {
@@ -103,4 +107,46 @@ fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, modifier: Modifier = Mod
             m.invalidate()
         }
     })
+}
+
+/** Tocco sulla mappa: l'elemento più vicino entro ~28 dp (punto, o tratto di una way) viene segnalato. */
+private class TapOverlay(
+    private val geometry: ChangeGeometry,
+    private val density: Float,
+    private val onTap: (ElementRef) -> Unit,
+) : Overlay() {
+    override fun onSingleTapConfirmed(e: android.view.MotionEvent, map: MapView): Boolean {
+        val pj = map.projection
+        val maxD = 28f * density
+        var best: ElementRef? = null
+        var bestD = Float.MAX_VALUE
+        val a = Point()
+        val b = Point()
+        for (p in geometry.points) {
+            pj.toPixels(GeoPoint(p.at.lat, p.at.lon), a)
+            val dd = hypot(a.x - e.x, a.y - e.y)
+            if (dd < bestD) { bestD = dd; best = p.ref }
+        }
+        for (l in geometry.lines) {
+            var prev: Point? = null
+            for (pt in l.points) {
+                val cur = Point(); pj.toPixels(GeoPoint(pt.lat, pt.lon), cur)
+                prev?.let { q ->
+                    val dd = distToSegment(e.x, e.y, q.x.toFloat(), q.y.toFloat(), cur.x.toFloat(), cur.y.toFloat())
+                    if (dd < bestD) { bestD = dd; best = l.ref }
+                }
+                prev = cur
+            }
+        }
+        val hit = best
+        if (hit != null && bestD <= maxD) { onTap(hit); return true }
+        return false
+    }
+
+    private fun distToSegment(px: Float, py: Float, ax: Float, ay: Float, bx: Float, by: Float): Float {
+        val dx = bx - ax; val dy = by - ay
+        val len2 = dx * dx + dy * dy
+        val t = if (len2 == 0f) 0f else (((px - ax) * dx + (py - ay) * dy) / len2).coerceIn(0f, 1f)
+        return hypot(px - (ax + t * dx), py - (ay + t * dy))
+    }
 }

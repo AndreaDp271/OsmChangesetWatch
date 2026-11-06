@@ -70,7 +70,8 @@ class ChangeGeometryTest {
     @Test fun multiFetch_skipsNodesWithoutCoordinates() {
         val xml = """<osm><node id="1" visible="true" lat="1.5" lon="2.5"/><node id="2" visible="false"/><way id="9"><nd ref="1"/><nd ref="2"/></way></osm>"""
         val e = MultiFetchParser.parse(ByteArrayInputStream(xml.toByteArray()))
-        assertEquals(setOf(1L), e.nodes.keys)
-        assertEquals(listOf(1L, 2L), e.ways[9])
+        assertEquals(1.5, e.items[1L]!!.at!!.lat, 1e-9)
+        assertEquals(null, e.items[2L]!!.at) // cancellato: nessuna coordinata
+        assertEquals(listOf(1L, 2L), e.items[9L]!!.refs)
     }
 }

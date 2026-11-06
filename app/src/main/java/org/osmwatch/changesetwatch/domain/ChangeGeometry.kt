@@ -4,8 +4,8 @@ data class LatLon(val lat: Double, val lon: Double)
 
 data class VersionedId(val id: Long, val version: Int?)
 
-data class DrawPoint(val action: ChangeAction, val at: LatLon)
-data class DrawLine(val action: ChangeAction, val points: List<LatLon>)
+data class DrawPoint(val action: ChangeAction, val at: LatLon, val ref: ElementRef)
+data class DrawLine(val action: ChangeAction, val points: List<LatLon>, val ref: ElementRef)
 
 /** [partial]: qualche elemento non è stato disegnato (coordinate non ricavabili o limite di richieste). */
 data class ChangeGeometry(val points: List<DrawPoint>, val lines: List<DrawLine>, val partial: Boolean) {
@@ -17,6 +17,9 @@ data class ChangeGeometry(val points: List<DrawPoint>, val lines: List<DrawLine>
 interface ElementSource {
     fun nodes(ids: List<VersionedId>): Map<Long, LatLon>
     fun ways(ids: List<VersionedId>): Map<Long, List<Long>>
+
+    /** Stato completo (coordinate, nodi, tag) di versioni precise: serve al dettaglio di un elemento toccato sulla mappa. */
+    fun details(type: ElementType, ids: List<VersionedId>): Map<Long, ElementData> = emptyMap()
 }
 
 /**
@@ -65,13 +68,13 @@ object GeometryResolver {
             var run = ArrayList<LatLon>()
             for (r in refs) {
                 val at = known[r]
-                if (at != null) run += at else { partial = true; if (run.size >= 2) lines += DrawLine(w.action, run); run = ArrayList() }
+                if (at != null) run += at else { partial = true; if (run.size >= 2) lines += DrawLine(w.action, run, ElementRef(ElementType.WAY, w.id, w.version)); run = ArrayList() }
             }
-            if (run.size >= 2) lines += DrawLine(w.action, run)
+            if (run.size >= 2) lines += DrawLine(w.action, run, ElementRef(ElementType.WAY, w.id, w.version))
         }
 
         val inWays = refsOf.values.flatten().toSet()
-        val points = change.nodes.filter { it.id !in inWays }.mapNotNull { n -> known[n.id]?.let { DrawPoint(n.action, it) } }
+        val points = change.nodes.filter { it.id !in inWays }.mapNotNull { n -> known[n.id]?.let { DrawPoint(n.action, it, ElementRef(ElementType.NODE, n.id, n.version)) } }
         return ChangeGeometry(points, lines, partial)
     }
 }

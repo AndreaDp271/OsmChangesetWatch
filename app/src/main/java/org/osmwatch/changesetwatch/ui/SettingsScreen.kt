@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
@@ -75,6 +76,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val lang by AppSettings.lang.collectAsState()
     var interval by remember { mutableIntStateOf(prefs.intervalMinutes) }
     var notif by remember { mutableStateOf(prefs.notificationsEnabled) }
+    var maxChanges by remember { mutableIntStateOf(prefs.maxChanges) }
     var cacheDialog by remember { mutableStateOf(false) }
     var cacheTick by remember { mutableIntStateOf(0) }
     val tilesDir = File(ctx.cacheDir, "osmdroid")
@@ -140,6 +142,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Choice(Prefs.INTERVALS, interval, { if (it < 60) "$it min" else "${it / 60} h" }) {
                     interval = it; prefs.intervalMinutes = it; PollWorker.schedule(ctx, it)
                 }
+            }
+
+            Group(stringResource(R.string.group_filter)) {
+                Item(Icons.Filled.FilterAlt, SetColors.general, stringResource(R.string.max_changes), stringResource(R.string.max_changes_desc))
+                Choice(Prefs.MAX_CHANGES, maxChanges, { it.toString() }) { maxChanges = it; prefs.maxChanges = it }
             }
 
             Group(stringResource(R.string.group_data)) {

@@ -16,6 +16,7 @@ import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 import org.osmwatch.changesetwatch.domain.BBox
 import org.osmwatch.changesetwatch.domain.Changeset
+import org.osmwatch.changesetwatch.domain.Verdict
 
 @Entity(tableName = "watch_area")
 data class WatchArea(
@@ -32,7 +33,6 @@ data class WatchArea(
     val bbox: BBox get() = BBox(minLat, minLon, maxLat, maxLon)
 }
 
-enum class Verdict { CONFIRMED, LIKELY, UNCERTAIN, OUTSIDE, SKIPPED_TOO_LARGE }
 
 /** Un changeset può comparire per più aree: chiave (id, areaId). Date in epoch ms. Usata dalla fase 3. */
 @Entity(
@@ -84,8 +84,14 @@ interface ChangesetDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE) // dedup su (id, areaId): non sovrascrive "seen"
     suspend fun insertAll(rows: List<ChangesetRow>): List<Long> // -1 = già presente
 
-    @Query("SELECT * FROM changeset WHERE (:areaId IS NULL OR areaId = :areaId) AND (:includeSeen OR seen = 0) ORDER BY createdAt DESC")
-    fun observe(areaId: Long?, includeSeen: Boolean): Flow<List<ChangesetRow>>
+    @Query("SELECT * FROM changeset WHERE (:areaId IS NULL OR areaId = :areaId) AND (:includeSeen OR seen = 0) AND verdict IN (:verdicts) ORDER BY createdAt DESC")
+    fun observe(areaId: Long?, includeSeen: Boolean, verdicts: List<String>): Flow<List<ChangesetRow>>
+
+    @Query("SELECT * FROM changeset WHERE areaId = :areaId AND verdict = 'PENDING' ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun pending(areaId: Long, limit: Int): List<ChangesetRow>
+
+    @Query("UPDATE changeset SET verdict = :verdict WHERE id = :id AND areaId = :areaId")
+    suspend fun setVerdict(id: Long, areaId: Long, verdict: String)
 
     @Query("SELECT * FROM changeset WHERE id = :id AND areaId = :areaId")
     fun observeOne(id: Long, areaId: Long): Flow<ChangesetRow?>
@@ -102,8 +108,8 @@ fun Changeset.toRow(areaId: Long, verdict: Verdict, now: Long) = ChangesetRow(
     verdict = verdict, fetchedAt = now,
 )
 
-// shortcut: exportSchema=false e nessuna migrazione, finché l'app non è rilasciata
-@Database(entities = [WatchArea::class, ChangesetRow::class], version = 1, exportSchema = false)
+// shortcut: nessuna migrazione (distruttiva) finché l'app non è rilasciata: version 2 = verdict PENDING
+@Database(entities = [WatchArea::class, ChangesetRow::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun areaDao(): AreaDao
     abstract fun changesetDao(): ChangesetDao
@@ -113,7 +119,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "osmwatch.db")
-                .build().also { instance = it }
+                .fallbackToDestructiveMigration().build().also { instance = it }
         }
     }
 }

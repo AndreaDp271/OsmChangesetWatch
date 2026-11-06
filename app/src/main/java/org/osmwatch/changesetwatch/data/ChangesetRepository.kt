@@ -1,20 +1,35 @@
 package org.osmwatch.changesetwatch.data
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.osmwatch.changesetwatch.domain.ChangesetVerifier
+import org.osmwatch.changesetwatch.domain.Verdict
 import org.osmwatch.changesetwatch.network.OsmClient
+import org.osmwatch.changesetwatch.network.OsmElementSource
 import org.osmwatch.changesetwatch.network.fetchAllPages
 
-class ChangesetRepository(private val db: AppDatabase, private val client: OsmClient = OsmClient()) {
+class ChangesetRepository(
+    private val db: AppDatabase,
+    private val client: OsmClient = OsmClient(),
+    private val maxChanges: () -> Int = { 2000 },
+) {
 
     /** Sovrapposizione di sicurezza sul bordo temporale; i doppioni sono scartati dal DB. */
     private val overlapMs = 5 * 60_000L
 
-    /** Ultimi 100 changeset dell'area, anche precedenti alla sua creazione. Ritorna le righe nuove. */
-    suspend fun refreshLatest(area: WatchArea): List<ChangesetRow> {
+    /** Quante verifiche (download osmChange) al massimo per area e per giro; il resto resta PENDING per il giro dopo. */
+    private val verifyBudget = 25
+
+    /**
+     * Ultimi 100 changeset dell'area, anche precedenti alla sua creazione, poi verifica geometrica.
+     * Ritorna i changeset che risultano davvero nell'area (CONFIRMED) verificati in questo giro.
+     */
+    suspend fun refreshLatest(area: WatchArea, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<ChangesetRow> {
         val now = System.currentTimeMillis()
         val fetched = withContext(Dispatchers.IO) { client.fetchChangesets(area.bbox) }
-        return store(area, fetched.map { it.toRow(area.id, Verdict.UNCERTAIN, now) }, now)
+        store(area, fetched.map { it.toRow(area.id, Verdict.PENDING, now) }, now)
+        return verifyPending(area, onProgress)
     }
 
     /**
@@ -28,13 +43,40 @@ class ChangesetRepository(private val db: AppDatabase, private val client: OsmCl
         val fetched = withContext(Dispatchers.IO) {
             fetchAllPages { before -> client.fetchChangesets(area.bbox, closedAfter = since, createdBefore = before) }
         }
-        return store(area, fetched.map { it.toRow(area.id, Verdict.UNCERTAIN, now) }, now)
+        store(area, fetched.map { it.toRow(area.id, Verdict.PENDING, now) }, now)
+        return verifyPending(area)
     }
 
-    /** Inserisce e aggiorna lastCheckedAt (l'istante *prima* della richiesta). Ritorna solo le righe davvero nuove. */
-    private suspend fun store(area: WatchArea, rows: List<ChangesetRow>, checkedAt: Long): List<ChangesetRow> {
-        val ids = db.changesetDao().insertAll(rows)
+    /** Verifica i PENDING dell'area, dal più recente. Un errore di rete interrompe il giro: restano PENDING. */
+    suspend fun verifyPending(area: WatchArea, onProgress: (Int, Int) -> Unit = { _, _ -> }): List<ChangesetRow> {
+        val pending = db.changesetDao().pending(area.id, verifyBudget)
+        val verifier = ChangesetVerifier(
+            maxChanges = maxChanges(),
+            fetchChange = { id -> Thread.sleep(1_000); client.fetchOsmChange(id) }, // un osmChange alla volta
+            src = OsmElementSource(client),
+        )
+        val confirmed = mutableListOf<ChangesetRow>()
+        pending.forEachIndexed { i, row ->
+            onProgress(i, pending.size)
+            val bbox = if (row.bboxMinLat != null) org.osmwatch.changesetwatch.domain.BBox(row.bboxMinLat, row.bboxMinLon!!, row.bboxMaxLat!!, row.bboxMaxLon!!) else null
+            val verdict = try {
+                withContext(Dispatchers.IO) { verifier.verify(row.id, bbox, row.changesCount, area.bbox) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("Repo", "verifica ${row.id} fallita: ${e.message}")
+                return confirmed
+            }
+            db.changesetDao().setVerdict(row.id, area.id, verdict.name)
+            if (verdict == Verdict.CONFIRMED) confirmed += row.copy(verdict = verdict)
+        }
+        onProgress(pending.size, pending.size)
+        return confirmed
+    }
+
+    /** Inserisce e aggiorna lastCheckedAt (l'istante *prima* della richiesta). */
+    private suspend fun store(area: WatchArea, rows: List<ChangesetRow>, checkedAt: Long) {
+        db.changesetDao().insertAll(rows)
         db.areaDao().setLastChecked(area.id, checkedAt)
-        return rows.filterIndexed { i, _ -> ids[i] != -1L }
     }
 }

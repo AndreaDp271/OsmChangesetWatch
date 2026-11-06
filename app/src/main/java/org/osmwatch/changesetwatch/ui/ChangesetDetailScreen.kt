@@ -18,6 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import org.osmwatch.changesetwatch.domain.BBox
+import org.osmwatch.changesetwatch.domain.ChangeAction
+import org.osmwatch.changesetwatch.domain.ElementDiff
+import org.osmwatch.changesetwatch.domain.ElementRef
+import org.osmwatch.changesetwatch.domain.ElementType
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.font.FontWeight
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -46,10 +53,12 @@ import org.osmwatch.changesetwatch.domain.Links
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangesetDetailScreen(
-    row: ChangesetRow?, areaName: String?, geo: GeoState, onLoadGeometry: (ChangesetRow) -> Unit, onMarkSeen: () -> Unit, onBack: () -> Unit,
+    row: ChangesetRow?, areaName: String?, geo: GeoState, diff: DiffState?, onLoadGeometry: (ChangesetRow) -> Unit,
+    onElementTap: (ElementRef) -> Unit, onDismissDiff: () -> Unit, onMarkSeen: () -> Unit, onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     LaunchedEffect(row?.id) { row?.let(onLoadGeometry) }
+    if (diff != null) DiffDialog(diff, onDismissDiff)
     val context = LocalContext.current
     fun open(template: String) {
         val url = Links.url(template, row!!.id)
@@ -76,7 +85,7 @@ fun ChangesetDetailScreen(
             Field(R.string.f_changes, (row.changesCount ?: 0).toString())
             if (row.bboxMinLat != null) Field(R.string.f_bbox, "%.5f,%.5f → %.5f,%.5f".format(row.bboxMinLon, row.bboxMinLat, row.bboxMaxLon, row.bboxMaxLat))
             Field(R.string.f_verdict, row.verdict.name)
-            ChangesMap(row, geo)
+            ChangesMap(row, geo, onElementTap)
             Button(onClick = { open(Links.OSM) }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) { Text(stringResource(R.string.open_osm)) }
             OutlinedButton(onClick = { open(Links.ACHAVI) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.open_achavi)) }
             OutlinedButton(onClick = { open(Links.OSMCHA) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.open_osmcha)) }
@@ -96,11 +105,11 @@ private fun Field(label: Int, value: String) {
 }
 
 @Composable
-private fun ChangesMap(row: ChangesetRow, geo: GeoState) {
+private fun ChangesMap(row: ChangesetRow, geo: GeoState, onElementTap: (ElementRef) -> Unit) {
     val g = (geo as? GeoState.Ready)?.geometry
     val bbox = if (row.bboxMinLat != null) BBox(row.bboxMinLat, row.bboxMinLon!!, row.bboxMaxLat!!, row.bboxMaxLon!!) else null
     Text(stringResource(R.string.map_title), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
-    MiniMap(g, bbox, Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(16.dp)))
+    MiniMap(g, bbox, onElementTap, Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(16.dp)))
     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Legend(ChangeStyle.NEW, R.string.legend_new)
         Legend(ChangeStyle.MODIFIED, R.string.legend_modified)
@@ -122,5 +131,53 @@ private fun Legend(color: Int, label: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(12.dp).clip(CircleShape).background(Color(color)))
         Text(stringResource(label), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 6.dp))
+    }
+}
+
+@Composable
+private fun DiffDialog(state: DiffState, onDismiss: () -> Unit) {
+    val ref = when (state) { is DiffState.Loading -> state.ref; is DiffState.Failed -> state.ref; is DiffState.Ready -> state.diff.ref }
+    val kind = stringResource(if (ref.type == ElementType.NODE) R.string.el_node else R.string.el_way)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
+        title = { Text("$kind #${ref.id}") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                when (state) {
+                    is DiffState.Loading -> Text(stringResource(R.string.geo_loading))
+                    is DiffState.Failed -> Text(stringResource(R.string.diff_failed))
+                    is DiffState.Ready -> DiffBody(state.diff)
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun DiffBody(d: ElementDiff) {
+    val green = Color(ChangeStyle.NEW); val orange = Color(ChangeStyle.MODIFIED); val red = Color(ChangeStyle.DELETED)
+    val (label, color) = when (d.action) {
+        ChangeAction.CREATE -> R.string.legend_new to green
+        ChangeAction.MODIFY -> R.string.legend_modified to orange
+        ChangeAction.DELETE -> R.string.legend_deleted to red
+    }
+    Text(stringResource(label), color = color, style = MaterialTheme.typography.titleSmall)
+    if (d.previousMissing) Text(stringResource(R.string.diff_no_previous), style = MaterialTheme.typography.bodySmall)
+    d.movedMeters?.let { Text(stringResource(R.string.diff_moved, it.roundToInt()), Modifier.padding(top = 8.dp)) }
+    if (d.nodesAdded > 0 || d.nodesRemoved > 0) Text(stringResource(R.string.diff_nodes, d.nodesAdded, d.nodesRemoved), Modifier.padding(top = 8.dp))
+    if (d.tags.isEmpty() && d.movedMeters == null && d.nodesAdded == 0 && d.nodesRemoved == 0 && !d.previousMissing) {
+        Text(stringResource(R.string.diff_none), Modifier.padding(top = 8.dp))
+    }
+    d.tags.forEach { t ->
+        val (sign, c, text) = when {
+            t.old == null -> Triple("+", green, "${t.key} = ${t.new}")
+            t.new == null -> Triple("−", red, "${t.key} = ${t.old}")
+            else -> Triple("~", orange, "${t.key}: ${t.old} → ${t.new}")
+        }
+        Row(Modifier.padding(top = 6.dp)) {
+            Text(sign, color = c, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp))
+            Text(text, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }

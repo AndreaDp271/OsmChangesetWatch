@@ -10,7 +10,9 @@ import okhttp3.Request
 import okhttp3.Response
 import org.osmwatch.changesetwatch.domain.BBox
 import org.osmwatch.changesetwatch.domain.Changeset
+import org.osmwatch.changesetwatch.domain.ElementData
 import org.osmwatch.changesetwatch.domain.ElementSource
+import org.osmwatch.changesetwatch.domain.ElementType
 import org.osmwatch.changesetwatch.domain.LatLon
 import org.osmwatch.changesetwatch.domain.VersionedId
 import org.osmwatch.changesetwatch.domain.OsmChangeSummary
@@ -96,16 +98,23 @@ class OsmClient(
  * Un 404 (elemento redatto) salta il blocco: il risultato resta parziale invece di fallire.
  */
 class OsmElementSource(private val client: OsmClient, private val pauseMs: Long = 500) : ElementSource {
-    override fun nodes(ids: List<VersionedId>): Map<Long, LatLon> = chunked(ids, "nodes").flatMap { it.nodes.entries }.associate { it.key to it.value }
-    override fun ways(ids: List<VersionedId>): Map<Long, List<Long>> = chunked(ids, "ways").flatMap { it.ways.entries }.associate { it.key to it.value }
+    override fun nodes(ids: List<VersionedId>): Map<Long, LatLon> =
+        details(ElementType.NODE, ids).mapNotNull { (k, v) -> v.at?.let { k to it } }.toMap()
 
-    private fun chunked(ids: List<VersionedId>, kind: String): List<Elements> =
-        ids.chunked(100).mapIndexedNotNull { i, chunk ->
+    override fun ways(ids: List<VersionedId>): Map<Long, List<Long>> =
+        details(ElementType.WAY, ids).mapValues { it.value.refs }
+
+    override fun details(type: ElementType, ids: List<VersionedId>): Map<Long, ElementData> {
+        val kind = if (type == ElementType.NODE) "nodes" else "ways"
+        val out = HashMap<Long, ElementData>()
+        ids.chunked(100).forEachIndexed { i, chunk ->
             if (i > 0) Thread.sleep(pauseMs)
             try {
-                client.fetchElements(kind, chunk)
+                out += client.fetchElements(kind, chunk).items
             } catch (e: OsmHttpException) {
-                if (e.code == 404) null else throw e
+                if (e.code != 404) throw e
             }
         }
+        return out
+    }
 }

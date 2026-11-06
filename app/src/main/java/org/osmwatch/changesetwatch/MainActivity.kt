@@ -104,16 +104,19 @@ private fun AppRoot(cvm: ChangesetsViewModel, vm: AreasViewModel = viewModel()) 
         val seen by cvm.includeSeen.collectAsState()
         val refreshing by cvm.refreshing.collectAsState()
         val error by cvm.error.collectAsState()
+        val showAll by cvm.showAll.collectAsState()
+        val progress by cvm.progress.collectAsState()
         ChangesetsScreen(
-            rows = rows, areas = allAreas, areaFilter = filter, includeSeen = seen, refreshing = refreshing, error = error,
-            onAreaFilter = { cvm.areaFilter.value = it }, onIncludeSeen = { cvm.includeSeen.value = it },
+            rows = rows, areas = allAreas, areaFilter = filter, includeSeen = seen, showAll = showAll, progress = progress, refreshing = refreshing, error = error,
+            onAreaFilter = { cvm.areaFilter.value = it }, onIncludeSeen = { cvm.includeSeen.value = it }, onShowAll = { cvm.showAll.value = it },
             onRefresh = cvm::refresh, onOpen = { detail = listOf(it.id, it.areaId) }, onAreas = { showAreas = true }, onSettings = { showSettings = true },
         )
     } else if (d != null) {
         val row by remember(d) { cvm.observeOne(d[0], d[1]) }.collectAsState(null)
         ChangesetDetailScreen(
             row = row, areaName = cvm.areas.value.firstOrNull { it.id == d[1] }?.name,
-            geo = cvm.geoState.collectAsState().value, onLoadGeometry = cvm::loadGeometry,
+            geo = cvm.geoState.collectAsState().value, diff = cvm.diffState.collectAsState().value, onLoadGeometry = cvm::loadGeometry,
+            onElementTap = cvm::loadDiff, onDismissDiff = cvm::clearDiff,
             onMarkSeen = { cvm.markSeen(d[0], d[1]) }, onBack = { detail = null },
         )
     } else if (id == null) {

@@ -26,10 +26,26 @@ data class Changeset(
 
 enum class ChangeAction { CREATE, MODIFY, DELETE }
 
-/** lat/lon null: i nodi cancellati nel osmChange non hanno coordinate (verificato sull'API). */
-data class ChangedNode(val id: Long, val action: ChangeAction, val lat: Double?, val lon: Double?, val version: Int? = null)
+/** PENDING = non ancora verificato; gli altri sono l'esito della verifica geometrica (vedi [ChangesetVerifier]). */
+enum class Verdict { PENDING, CONFIRMED, LIKELY, UNCERTAIN, OUTSIDE, SKIPPED_TOO_LARGE }
 
-data class ChangedWay(val id: Long, val action: ChangeAction, val version: Int?, val nodeRefs: List<Long>)
+enum class ElementType { NODE, WAY }
+
+data class ElementRef(val type: ElementType, val id: Long, val version: Int?)
+
+/** Stato di un elemento OSM (nodo: [at]; way: [refs]). */
+data class ElementData(val at: LatLon?, val refs: List<Long>, val tags: Map<String, String>)
+
+/** lat/lon null: i nodi cancellati nel osmChange non hanno coordinate (verificato sull'API). */
+data class ChangedNode(
+    val id: Long, val action: ChangeAction, val lat: Double?, val lon: Double?, val version: Int? = null,
+    val tags: Map<String, String> = emptyMap(),
+)
+
+data class ChangedWay(
+    val id: Long, val action: ChangeAction, val version: Int?, val nodeRefs: List<Long>,
+    val tags: Map<String, String> = emptyMap(),
+)
 
 data class OsmChangeSummary(
     val nodes: List<ChangedNode>,

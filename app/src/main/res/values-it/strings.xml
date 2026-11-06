@@ -79,4 +79,17 @@
     <string name="geo_failed">Impossibile caricare le modifiche: mostro solo l\'area del changeset.</string>
     <string name="geo_empty">Nessuna modifica disegnabile (solo relation o senza coordinate).</string>
     <string name="geo_partial">Vista parziale: alcuni elementi non hanno una posizione nota (cancellati o relation).</string>
+    <string name="show_unverified">Anche non verificati</string>
+    <string name="verifying">Verifica dei changeset: %1$s</string>
+    <string name="group_filter">Filtro</string>
+    <string name="max_changes">Modifiche massime da verificare</string>
+    <string name="max_changes_desc">I changeset più grandi non vengono scaricati e restano nascosti (non verificati)</string>
+    <string name="close">Chiudi</string>
+    <string name="el_node">Nodo</string>
+    <string name="el_way">Via</string>
+    <string name="diff_failed">Impossibile caricare le modifiche.</string>
+    <string name="diff_no_previous">Versione precedente non disponibile.</string>
+    <string name="diff_none">Nessuna modifica a tag o geometria.</string>
+    <string name="diff_moved">Spostato di %1$d m</string>
+    <string name="diff_nodes">Nodi: +%1$d / −%2$d</string>
 </resources>

@@ -83,3 +83,19 @@ class LiveGeometryTest {
         println("LIVE: azioni punti=${g.points.groupBy { it.action }.mapValues { it.value.size }} linee=${g.lines.groupBy { it.action }.mapValues { it.value.size }}")
     }
 }
+
+class LiveVerifyTest {
+    /** `OSM_LIVE=1 gradlew testDebugUnitTest --tests "*LiveVerifyTest*" -i`: verdetti reali su 30 changeset di Roma. */
+    @Test fun liveVerify() {
+        assumeTrue(System.getenv("OSM_LIVE") == "1")
+        val area = BBox(41.8512, 12.4705, 41.9415, 12.5447)
+        val c = OsmClient()
+        val list = c.fetchChangesets(area).take(30)
+        val v = org.osmwatch.changesetwatch.domain.ChangesetVerifier(2000, { Thread.sleep(700); c.fetchOsmChange(it) }, OsmElementSource(c, 300))
+        val res = list.map { cs -> cs to v.verify(cs.id, cs.bbox, cs.changesCount, area) }
+        println("LIVE: " + res.groupingBy { it.second }.eachCount())
+        res.filter { it.second != org.osmwatch.changesetwatch.domain.Verdict.CONFIRMED }.forEach {
+            println("LIVE: ${it.second} #${it.first.id} changes=${it.first.changesCount} bbox=${it.first.bbox}")
+        }
+    }
+}

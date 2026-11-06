@@ -32,7 +32,7 @@ class PollWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
 
     override suspend fun doWork(): Result {
         val db = AppDatabase.get(applicationContext)
-        val repo = ChangesetRepository(db)
+        val repo = ChangesetRepository(db, maxChanges = { Prefs(applicationContext).maxChanges })
         val areas = db.areaDao().observeAll().first().filter { it.enabled }
         var failures = 0
         areas.forEachIndexed { i, area ->

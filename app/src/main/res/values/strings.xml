@@ -80,4 +80,17 @@
     <string name="geo_failed">Could not load the changes: showing only the changeset area.</string>
     <string name="geo_empty">No drawable changes (relations only or no coordinates).</string>
     <string name="geo_partial">Partial view: some elements have no known position (deleted or relations).</string>
+    <string name="show_unverified">Also unverified</string>
+    <string name="verifying">Checking changesets: %1$s</string>
+    <string name="group_filter">Filter</string>
+    <string name="max_changes">Maximum changes to check</string>
+    <string name="max_changes_desc">Larger changesets are not downloaded and stay hidden (unverified)</string>
+    <string name="close">Close</string>
+    <string name="el_node">Node</string>
+    <string name="el_way">Way</string>
+    <string name="diff_failed">Could not load the changes.</string>
+    <string name="diff_no_previous">Previous version not available.</string>
+    <string name="diff_none">No tag or geometry changes.</string>
+    <string name="diff_moved">Moved by %1$d m</string>
+    <string name="diff_nodes">Nodes: +%1$d / −%2$d</string>
 </resources>

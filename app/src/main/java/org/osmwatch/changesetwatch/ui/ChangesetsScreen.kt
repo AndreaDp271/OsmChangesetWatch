@@ -42,10 +42,13 @@ fun ChangesetsScreen(
     areas: List<WatchArea>,
     areaFilter: Long?,
     includeSeen: Boolean,
+    showAll: Boolean,
+    progress: String?,
     refreshing: Boolean,
     error: String?,
     onAreaFilter: (Long?) -> Unit,
     onIncludeSeen: (Boolean) -> Unit,
+    onShowAll: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onOpen: (ChangesetRow) -> Unit,
     onAreas: () -> Unit,
@@ -74,6 +77,12 @@ fun ChangesetsScreen(
                 }
                 item {
                     FilterChip(
+                        selected = showAll, onClick = { onShowAll(!showAll) },
+                        label = { Text(stringResource(R.string.show_unverified)) }, modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+                item {
+                    FilterChip(
                         selected = areaFilter == null, onClick = { onAreaFilter(null) },
                         label = { Text(stringResource(R.string.all_areas)) }, modifier = Modifier.padding(end = 8.dp),
                     )
@@ -85,6 +94,7 @@ fun ChangesetsScreen(
                     )
                 }
             }
+            if (progress != null) Text(stringResource(R.string.verifying, progress), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(16.dp, 4.dp))
             if (error != null) Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp, 4.dp))
             PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh) {
                 LazyColumn {

@@ -5,7 +5,7 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
 ## Stato
 - [x] Fase 1 — scheletro e rete (completata, vedi sotto)
 - [x] Fase 2 — verificata su telefono (CPH2363): crea/modifica/disabilita/elimina, dati persistenti al riavvio
-- [ ] Fasi 3-6
+- [ ] Fase 6
 
 ## Decisioni
 - Gradle 8.9, AGP 8.7.3, Kotlin 2.0.21, compileSdk/targetSdk 35, minSdk 26.
@@ -36,3 +36,13 @@ Fase 5: filtro anti-falso-positivo (pipeline + test). Soglie da concordare (doma
 - Verificato sull'API: i nodi cancellati NON hanno coordinate nel osmChange -> si usa la versione v-1. Le way non hanno coordinate -> nodi dal osmChange, gli altri alla posizione corrente.
 - Colori: nuovo verde pieno, modificato arancione, eliminato rosso tratteggiato/cerchio vuoto. Relation non disegnate; >2000 modifiche: non scarica.
 - Test: ChangeGeometryTest (resolver con sorgente finta), live: `OSM_LIVE=1 OSM_CS=<id> gradlew testDebugUnitTest --tests "*LiveGeometryTest*" -i`.
+
+## Fase 5 (filtro) — fatto, in versione "precisa" (richiesta autore: i changeset devono essere DENTRO l'area)
+- `ChangesetVerifier`: bbox changeset dentro area -> CONFIRMED (senza download); disgiunta -> OUTSIDE; > maxChanges (default 2000, in Impostazioni) -> SKIPPED_TOO_LARGE;
+  altrimenti osmChange: nodo dentro -> CONFIRMED; poi geometria ricostruita (way, nodi cancellati): punto dentro o tratto che attraversa l'area -> CONFIRMED;
+  nessun contatto: OUTSIDE (completo) o UNCERTAIN (parziale/relation). Niente regola "bbox N volte l'area": la verifica precisa la rende inutile.
+- Nuovo verdict PENDING (non ancora verificato). Default: lista = solo CONFIRMED; chip "Anche non verificati" mostra il resto. Notifiche solo per CONFIRMED.
+- Budget: 25 verifiche per area e per giro (1 osmChange/s); il resto resta PENDING per il giro dopo.
+- DB version 2 con migrazione distruttiva (pre-release): le aree vanno ricreate dopo l'aggiornamento da build precedenti.
+- Tocco su un elemento della minimappa: dialogo con tag aggiunti/cambiati/rimossi, spostamento (m), nodi +/- (v-1 via multi-fetch).
+- Live: `OSM_LIVE=1 gradlew testDebugUnitTest --tests "*LiveVerifyTest*" -i` (30 reali di Roma: 28 CONFIRMED, 2 UNCERTAIN con bbox multi-paese).
