@@ -1,6 +1,8 @@
 package org.osmwatch.changesetwatch.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,10 +42,17 @@ fun AreasScreen(
     onEdit: (WatchArea) -> Unit,
     onToggle: (WatchArea, Boolean) -> Unit,
     onDelete: (WatchArea) -> Unit,
+    onBack: () -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     var toDelete by remember { mutableStateOf<WatchArea?>(null) }
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.areas)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.areas)) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) } },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAdd) { Icon(Icons.Default.Add, stringResource(R.string.new_area)) }
         },

@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,6 +21,9 @@ import org.osmwatch.changesetwatch.network.OsmConfig
 import org.osmwatch.changesetwatch.ui.AreaEditorScreen
 import org.osmwatch.changesetwatch.ui.AreasScreen
 import org.osmwatch.changesetwatch.ui.AreasViewModel
+import org.osmwatch.changesetwatch.ui.ChangesetDetailScreen
+import org.osmwatch.changesetwatch.ui.ChangesetsScreen
+import org.osmwatch.changesetwatch.ui.ChangesetsViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,17 +45,39 @@ class MainActivity : ComponentActivity() {
 private const val NEW_AREA = 0L
 
 @Composable
-private fun AppRoot(vm: AreasViewModel = viewModel()) {
+private fun AppRoot(vm: AreasViewModel = viewModel(), cvm: ChangesetsViewModel = viewModel()) {
     val areas by vm.areas.collectAsState()
+    var showAreas by rememberSaveable { mutableStateOf(false) }
     var editing by rememberSaveable { mutableStateOf<Long?>(null) } // null = lista, 0 = nuova, >0 = id area
+    var detail by rememberSaveable { mutableStateOf<List<Long>?>(null) } // [id changeset, id area]
     val id = editing
-    if (id == null) {
+    val d = detail
+    if (id == null && !showAreas && d == null) {
+        val rows by cvm.changesets.collectAsState()
+        val allAreas by cvm.areas.collectAsState()
+        val filter by cvm.areaFilter.collectAsState()
+        val seen by cvm.includeSeen.collectAsState()
+        val refreshing by cvm.refreshing.collectAsState()
+        val error by cvm.error.collectAsState()
+        ChangesetsScreen(
+            rows = rows, areas = allAreas, areaFilter = filter, includeSeen = seen, refreshing = refreshing, error = error,
+            onAreaFilter = { cvm.areaFilter.value = it }, onIncludeSeen = { cvm.includeSeen.value = it },
+            onRefresh = cvm::refresh, onOpen = { detail = listOf(it.id, it.areaId) }, onAreas = { showAreas = true },
+        )
+    } else if (d != null) {
+        val row by remember(d) { cvm.observeOne(d[0], d[1]) }.collectAsState(null)
+        ChangesetDetailScreen(
+            row = row, areaName = cvm.areas.value.firstOrNull { it.id == d[1] }?.name,
+            onMarkSeen = { cvm.markSeen(d[0], d[1]) }, onBack = { detail = null },
+        )
+    } else if (id == null) {
         AreasScreen(
             areas = areas,
             onAdd = { editing = NEW_AREA },
             onEdit = { editing = it.id },
             onToggle = { a, on -> vm.setEnabled(a.id, on) },
             onDelete = { vm.delete(it.id) },
+            onBack = { showAreas = false },
         )
     } else {
         val area = areas?.firstOrNull { it.id == id }

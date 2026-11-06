@@ -6,6 +6,8 @@ import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
@@ -13,6 +15,7 @@ import androidx.room.RoomDatabase
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 import org.osmwatch.changesetwatch.domain.BBox
+import org.osmwatch.changesetwatch.domain.Changeset
 
 @Entity(tableName = "watch_area")
 data class WatchArea(
@@ -68,14 +71,42 @@ interface AreaDao {
     @Query("UPDATE watch_area SET enabled = :enabled WHERE id = :id")
     suspend fun setEnabled(id: Long, enabled: Boolean)
 
+    @Query("UPDATE watch_area SET lastCheckedAt = :at WHERE id = :id")
+    suspend fun setLastChecked(id: Long, at: Long)
+
     @Query("DELETE FROM watch_area WHERE id = :id")
     suspend fun delete(id: Long)
 }
+
+
+@Dao
+interface ChangesetDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE) // dedup su (id, areaId): non sovrascrive "seen"
+    suspend fun insertAll(rows: List<ChangesetRow>)
+
+    @Query("SELECT * FROM changeset WHERE (:areaId IS NULL OR areaId = :areaId) AND (:includeSeen OR seen = 0) ORDER BY createdAt DESC")
+    fun observe(areaId: Long?, includeSeen: Boolean): Flow<List<ChangesetRow>>
+
+    @Query("SELECT * FROM changeset WHERE id = :id AND areaId = :areaId")
+    fun observeOne(id: Long, areaId: Long): Flow<ChangesetRow?>
+
+    @Query("UPDATE changeset SET seen = 1 WHERE id = :id AND areaId = :areaId")
+    suspend fun markSeen(id: Long, areaId: Long)
+}
+
+fun Changeset.toRow(areaId: Long, verdict: Verdict, now: Long) = ChangesetRow(
+    id = id, areaId = areaId, user = user, uid = uid,
+    createdAt = createdAt.toEpochMilli(), closedAt = closedAt?.toEpochMilli(),
+    comment = comment, createdBy = createdBy, source = source, changesCount = changesCount,
+    bboxMinLat = bbox?.minLat, bboxMinLon = bbox?.minLon, bboxMaxLat = bbox?.maxLat, bboxMaxLon = bbox?.maxLon,
+    verdict = verdict, fetchedAt = now,
+)
 
 // shortcut: exportSchema=false e nessuna migrazione, finché l'app non è rilasciata
 @Database(entities = [WatchArea::class, ChangesetRow::class], version = 1, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun areaDao(): AreaDao
+    abstract fun changesetDao(): ChangesetDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null

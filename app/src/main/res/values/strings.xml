@@ -14,4 +14,25 @@
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
     <string name="delete_area_title">Delete \"%1$s\"?</string>
+    <string name="unseen_only">Unseen only</string>
+    <string name="all_areas">All areas</string>
+    <string name="no_areas_home">Add an area first (map icon, top right).</string>
+    <string name="no_changesets">No changesets yet. Pull down to refresh.</string>
+    <string name="no_comment">(no comment)</string>
+    <string name="changes_n">%1$d changes</string>
+    <string name="f_user">User</string>
+    <string name="f_area">Area</string>
+    <string name="f_created">Created</string>
+    <string name="f_closed">Closed</string>
+    <string name="f_open">still open</string>
+    <string name="f_editor">Editor</string>
+    <string name="f_source">Source</string>
+    <string name="f_changes">Changes</string>
+    <string name="f_bbox">Bounding box</string>
+    <string name="f_verdict">Verdict</string>
+    <string name="open_osm">Open on osm.org</string>
+    <string name="open_achavi">Open in Achavi</string>
+    <string name="open_osmcha">Open in OSMCha</string>
+    <string name="mark_seen">Mark as seen</string>
+    <string name="seen">Seen</string>
 </resources>
