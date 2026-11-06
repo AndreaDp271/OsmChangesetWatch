@@ -1,6 +1,5 @@
 package org.osmwatch.changesetwatch.ui
 
-import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -169,7 +168,7 @@ private fun AreaCard(a: WatchArea, unseen: Int, onEdit: (() -> Unit)?, onToggle:
                     else Meta(if (a.polygon != null) Icons.Default.LocationCity else Icons.Default.SquareFoot, stringResource(R.string.area_km2, a.shape.areaKm2()))
                     Meta(
                         Icons.Default.Schedule,
-                        a.lastCheckedAt?.let { DateUtils.getRelativeTimeSpanString(it, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString() }
+                        a.lastCheckedAt?.let { relativeTime(it) }
                             ?: stringResource(R.string.never_checked),
                     )
                 }

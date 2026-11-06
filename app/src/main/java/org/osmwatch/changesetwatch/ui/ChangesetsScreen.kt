@@ -1,6 +1,5 @@
 package org.osmwatch.changesetwatch.ui
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -295,7 +294,7 @@ private fun ChangesetCard(r: ChangesetRow, area: WatchArea?, flags: List<Flag>, 
                     }
                 }
                 Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Meta(Icons.Default.Schedule, DateUtils.getRelativeTimeSpanString(r.createdAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString())
+                    Meta(Icons.Default.Schedule, relativeTime(r.createdAt))
                     Meta(Icons.Default.EditNote, pluralStringResource(R.plurals.changes_n, r.changesCount ?: 0, r.changesCount ?: 0))
                     r.createdBy?.let { Meta(Icons.Default.Build, RowTags.editor(it) ?: it) }
                 }

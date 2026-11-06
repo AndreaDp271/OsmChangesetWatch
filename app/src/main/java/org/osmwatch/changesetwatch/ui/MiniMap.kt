@@ -62,6 +62,13 @@ private class PointsOverlay(private val points: List<DrawPoint>, private val bef
     }
 }
 
+/**
+ * I tile OSM arrivano al 19; oltre, osmdroid ingrandisce quelli del 19 (fino a 29, illeggibile).
+ * Due livelli in più (tile ×4) restano leggibili e le geometrie disegnate sopra sono sempre nitide.
+ */
+const val MAX_ZOOM = 21.0
+private val TILE_ZOOM = TileSourceFactory.MAPNIK.maximumZoomLevel.toDouble()
+
 /** Minimappa non invasiva: mostra i cambiamenti (o, se non ricostruibili, la bbox del changeset) e si adatta all'area. */
 @Composable
 fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, onElementTap: (ElementRef) -> Unit, modifier: Modifier = Modifier) {
@@ -71,8 +78,7 @@ fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, onElementTap: (ElementRe
     val map = remember {
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
-            // osmdroid permetterebbe zoom 29 ingrandendo i tile del 19 (sgranati): fermati dove i tile OSM esistono
-            maxZoomLevel = TileSourceFactory.MAPNIK.maximumZoomLevel.toDouble()
+            maxZoomLevel = MAX_ZOOM
             setMultiTouchControls(true)
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             // dentro una colonna scrollabile: il gesto sulla mappa non deve scorrere la pagina
@@ -119,7 +125,11 @@ fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, onElementTap: (ElementRe
             }
             if (box == null) return@post
             if (max(box.latitudeSpan, box.longitudeSpan) < 1e-4) { m.controller.setZoom(18.0); m.controller.setCenter(box.centerWithDateLine) }
-            else m.zoomToBoundingBox(box, false, (40 * d).toInt())
+            else {
+                m.zoomToBoundingBox(box, false, (40 * d).toInt())
+                // oltre il 19 i tile non si scaricano: si apre al 19 (così finiscono in cache) e lo zoom in più lo fa l'utente
+                if (m.zoomLevelDouble > TILE_ZOOM) m.controller.setZoom(TILE_ZOOM)
+            }
             m.invalidate()
         }
     })

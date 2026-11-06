@@ -24,4 +24,5 @@
 - Database migrations keep existing areas (versions 2 to 5).
 - "Load more" at the end of the list fetches older changesets; the verification budget now counts only real downloads.
 - Element history inside the app, with the differences between versions and links to each changeset.
-- Maps stop at zoom 19, where OSM tiles exist, instead of showing blurry enlarged tiles.
+- Maps zoom up to 21; they open at most at zoom 19, where OSM tiles exist, and enlarge those beyond it (zoom 29 was unreadable).
+- Relative times ("4 hours ago") follow the app language instead of the system language.

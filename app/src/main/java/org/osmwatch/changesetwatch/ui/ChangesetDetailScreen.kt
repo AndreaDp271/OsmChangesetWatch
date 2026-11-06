@@ -1,7 +1,6 @@
 package org.osmwatch.changesetwatch.ui
 
 import android.text.format.DateFormat
-import android.text.format.DateUtils
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -152,7 +151,7 @@ fun ChangesetDetailScreen(vm: ChangesetsViewModel, id: Long, areaId: Long, area:
                         Text("#$id", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleLarge.tabular())
                         row?.let {
                             Text(
-                                DateUtils.getRelativeTimeSpanString(it.createdAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(),
+                                relativeTime(it.createdAt),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

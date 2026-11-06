@@ -1,5 +1,7 @@
 package org.osmwatch.changesetwatch.ui
 
+import android.icu.text.RelativeDateTimeFormatter
+import android.icu.util.ULocale
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -193,5 +195,25 @@ fun CountsBar(created: Int?, modified: Int?, deleted: Int?, modifier: Modifier =
             "+$created  ~$modified  −$deleted", style = MaterialTheme.typography.labelSmall.tabular(),
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 10.dp),
         )
+    }
+}
+
+/**
+ * "4 ore fa" nella lingua dell'app: DateUtils.getRelativeTimeSpanString segue la lingua di sistema
+ * e ignora quella scelta nelle impostazioni.
+ */
+@Composable
+fun relativeTime(ms: Long): String {
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val f = RelativeDateTimeFormatter.getInstance(ULocale.forLocale(locale))
+    val past = RelativeDateTimeFormatter.Direction.LAST
+    val min = (System.currentTimeMillis() - ms).coerceAtLeast(0) / 60_000
+    return when {
+        min < 1 -> f.format(RelativeDateTimeFormatter.Direction.PLAIN, RelativeDateTimeFormatter.AbsoluteUnit.NOW)
+        min < 60 -> f.format(min.toDouble(), past, RelativeDateTimeFormatter.RelativeUnit.MINUTES)
+        min < 24 * 60 -> f.format((min / 60).toDouble(), past, RelativeDateTimeFormatter.RelativeUnit.HOURS)
+        min < 2 * 24 * 60 -> f.format(past, RelativeDateTimeFormatter.AbsoluteUnit.DAY)
+        min < 7 * 24 * 60 -> f.format((min / (24 * 60)).toDouble(), past, RelativeDateTimeFormatter.RelativeUnit.DAYS)
+        else -> java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, locale).format(java.util.Date(ms))
     }
 }
