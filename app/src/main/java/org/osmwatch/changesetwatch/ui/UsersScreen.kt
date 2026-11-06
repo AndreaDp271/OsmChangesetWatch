@@ -85,7 +85,10 @@ fun UsersScreen(
             section(
                 R.string.users_watched,
                 R.string.users_watched_empty,
-                watched.mapNotNull { a -> a.watchUser?.let { it to { onUnwatch(a) } } },
+                // un utente per riga anche se, per un vecchio bug, è stato seguito due volte
+                watched
+                    .distinctBy { it.watchUser }
+                    .mapNotNull { a -> a.watchUser?.let { it to { onUnwatch(a) } } },
                 Icons.Default.NotificationsActive,
                 scheme.primary,
                 onOpen,

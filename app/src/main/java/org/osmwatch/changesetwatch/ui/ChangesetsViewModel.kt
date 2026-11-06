@@ -185,8 +185,9 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Segui un utente da qualsiasi changeset; ignora i doppioni. */
     fun watchUser(name: String) {
-        if (areas.value.any { it.watchUser == name }) return
         viewModelScope.launch {
+            // dal DB, non da [areas]: se nessuna schermata la osserva quella lista è vecchia
+            if (db.areaDao().isWatched(name)) return@launch
             db.areaDao()
                 .upsert(
                     WatchArea(
@@ -233,6 +234,14 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
      * EXTERNAL).
      */
     private val external = MutableStateFlow<Map<Long, ChangesetRow>>(emptyMap())
+
+    /**
+     * I changeset aperti da link stanno solo in memoria: se Android ha chiuso l'app e la riapre sul
+     * dettaglio, vanno riscaricati.
+     */
+    fun ensureExternal(id: Long) {
+        if (id !in external.value) openLink(id)
+    }
 
     fun observeOne(id: Long, areaId: Long): Flow<ChangesetRow?> =
         if (areaId == EXTERNAL) external.map { it[id] }

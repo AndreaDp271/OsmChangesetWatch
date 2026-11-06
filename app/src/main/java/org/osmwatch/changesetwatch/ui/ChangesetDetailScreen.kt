@@ -143,6 +143,7 @@ fun ChangesetDetailScreen(
     val activityLoading by vm.activityLoading.collectAsState()
     LaunchedEffect(profileOpen, row?.uid) { if (profileOpen) row?.uid?.let(vm::loadActivity) }
 
+    LaunchedEffect(id, areaId) { if (areaId == EXTERNAL) vm.ensureExternal(id) }
     LaunchedEffect(row?.id) {
         row?.let {
             vm.loadGeometry(it)

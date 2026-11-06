@@ -85,6 +85,9 @@ interface AreaDao {
 
     @Upsert suspend fun upsert(area: WatchArea)
 
+    @Query("SELECT COUNT(*) > 0 FROM watch_area WHERE watchUser = :user")
+    suspend fun isWatched(user: String): Boolean
+
     @Query("UPDATE watch_area SET enabled = :enabled WHERE id = :id")
     suspend fun setEnabled(id: Long, enabled: Boolean)
 

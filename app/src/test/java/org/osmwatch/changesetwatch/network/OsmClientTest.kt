@@ -55,30 +55,30 @@ class OsmClientTest {
         server.enqueue(
             MockResponse()
                 .setBody(
-                    """<table><tr><td><a href="/user_blocks/21457">Show</a></td></tr>
-                       <tr><td><a href="/user_blocks/900">Show</a></td></tr></table>"""
+                    """<table><tr><td><a href="/user_blocks/1001">Show</a></td></tr>
+                       <tr><td><a href="/user_blocks/1002">Show</a></td></tr></table>"""
                 )
         )
         server.enqueue(
             MockResponse()
                 .setBody(
-                    """<osm><user_block id="21457" created_at="2026-10-20T07:53:39Z"
-                        ends_at="2026-10-22T07:53:39Z"><user uid="1" user="Nix Nada"/>
-                        <creator uid="5164" user="woodpeck"/><reason>Dear user,
+                    """<osm><user_block id="1001" created_at="2026-10-20T07:53:39Z"
+                        ends_at="2026-10-22T07:53:39Z"><user uid="1" user="Example Mapper"/>
+                        <creator uid="2" user="moderator"/><reason>Dear user,
                         please stop.</reason></user_block></osm>"""
                 )
         )
         server.enqueue(
             MockResponse()
-                .setBody("""<osm><user_block id="900"><reason>x</reason></user_block></osm>""")
+                .setBody("""<osm><user_block id="1002"><reason>x</reason></user_block></osm>""")
         )
-        val blocks = c.fetchBlocks("Nix Nada")
-        assertEquals("/user/Nix%20Nada/blocks", server.takeRequest().path)
-        assertEquals("/api/0.6/user_blocks/21457", server.takeRequest().path)
-        assertEquals("/api/0.6/user_blocks/900", server.takeRequest().path)
-        assertEquals(listOf(21457L, 900L), blocks.map { it.id })
+        val blocks = c.fetchBlocks("Example Mapper")
+        assertEquals("/user/Example%20Mapper/blocks", server.takeRequest().path)
+        assertEquals("/api/0.6/user_blocks/1001", server.takeRequest().path)
+        assertEquals("/api/0.6/user_blocks/1002", server.takeRequest().path)
+        assertEquals(listOf(1001L, 1002L), blocks.map { it.id })
         val b = blocks[0]
-        assertEquals("woodpeck", b.creator)
+        assertEquals("moderator", b.creator)
         assertEquals(Instant.parse("2026-10-20T07:53:39Z"), b.createdAt)
         assertEquals(Instant.parse("2026-10-22T07:53:39Z"), b.endsAt)
         assertTrue(b.reason.startsWith("Dear user,") && b.reason.endsWith("please stop."))

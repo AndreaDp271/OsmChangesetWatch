@@ -16,8 +16,8 @@ class LinksTest {
     @Test
     fun userBlocksEncodesName() {
         assertEquals(
-            "https://www.openstreetmap.org/user/Nix%20Nada/blocks",
-            Links.userBlocks("Nix Nada"),
+            "https://www.openstreetmap.org/user/Example%20Mapper/blocks",
+            Links.userBlocks("Example Mapper"),
         )
         assertEquals(
             "https://www.openstreetmap.org/user/Citt%C3%A0/blocks",

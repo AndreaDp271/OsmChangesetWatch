@@ -22,7 +22,7 @@ class AreasViewModel(app: Application) : AndroidViewModel(app) {
     fun watchUser(name: String) =
         viewModelScope.launch {
             val n = name.trim().removePrefix("@")
-            if (n.isNotEmpty() && areas.value.orEmpty().none { it.watchUser == n }) {
+            if (n.isNotEmpty() && !dao.isWatched(n)) {
                 dao.upsert(
                     WatchArea(
                         name = "@$n",

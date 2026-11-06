@@ -168,7 +168,9 @@ private fun AppRoot(cvm: ChangesetsViewModel, vm: AreasViewModel = viewModel()) 
                 cvm.showUserChangesets(it)
                 showUsers = false
             },
-            onUnwatch = { vm.delete(it.id) },
+            onUnwatch = { a ->
+                areas.orEmpty().filter { it.watchUser == a.watchUser }.forEach { vm.delete(it.id) }
+            },
             onUnsuspect = cvm::toggleSuspect,
             onUntrust = cvm::toggleTrusted,
             onBack = { showUsers = false },
