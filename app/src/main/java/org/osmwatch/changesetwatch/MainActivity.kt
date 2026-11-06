@@ -110,50 +110,24 @@ private fun AppRoot(cvm: ChangesetsViewModel, vm: AreasViewModel = viewModel()) 
         req?.let { showSettings = false; showAreas = false; editing = null; detail = it; cvm.openRequest.value = null }
     }
     if (showSettings) {
-        SettingsScreen(onBack = { showSettings = false })
-    } else if (id == null && !showAreas && d == null) {
-        val rows by cvm.changesets.collectAsState()
-        val allAreas by cvm.areas.collectAsState()
-        val filter by cvm.areaFilter.collectAsState()
-        val seen by cvm.includeSeen.collectAsState()
-        val refreshing by cvm.refreshing.collectAsState()
-        val error by cvm.error.collectAsState()
-        val showAll by cvm.showAll.collectAsState()
-        val progress by cvm.progress.collectAsState()
-        val query by cvm.query.collectAsState()
-        val areasOnly by cvm.areasOnly.collectAsState()
-        val global by cvm.globalResults.collectAsState()
-        val searching by cvm.searching.collectAsState()
-        ChangesetsScreen(
-            query = query, onQuery = { cvm.query.value = it },
-            areasOnly = areasOnly, onAreasOnly = { cvm.areasOnly.value = it }, onSearch = { if (!areasOnly) cvm.searchGlobal() },
-            rows = if (areasOnly) rows else global, areas = allAreas, areaFilter = filter, includeSeen = seen, showAll = showAll, progress = progress,
-            onlyFlagged = cvm.onlyFlagged.collectAsState().value, onOnlyFlagged = { cvm.onlyFlagged.value = it },
-            hideTrusted = cvm.hideTrusted.collectAsState().value, onHideTrusted = { cvm.hideTrusted.value = it },
-            suspects = cvm.suspectUsers.collectAsState().value,
-            minChanges = cvm.minChanges.collectAsState().value, onMinChanges = cvm::cycleMinChanges,
-            maxAgeHours = cvm.maxAgeHours.collectAsState().value, onMaxAge = cvm::cycleMaxAge,
-            refreshing = refreshing || searching, error = error,
-            onAreaFilter = { cvm.areaFilter.value = it }, onIncludeSeen = { cvm.includeSeen.value = it }, onShowAll = { cvm.showAll.value = it },
-            onRefresh = cvm::refresh, onOpen = { detail = listOf(it.id, it.areaId) }, onAreas = { showAreas = true }, onSettings = { showSettings = true },
-        )
-    } else if (d != null) {
-        val row by remember(d) { cvm.observeOne(d[0], d[1]) }.collectAsState(null)
-        ChangesetDetailScreen(
-            row = row, areaName = if (d[1] == EXTERNAL) null else cvm.areas.value.firstOrNull { it.id == d[1] }?.name,
-            geo = cvm.geoState.collectAsState().value, diff = cvm.diffState.collectAsState().value, onLoadGeometry = cvm::loadGeometry,
-            onElementTap = cvm::loadDiff, onDismissDiff = cvm::clearDiff,
-            onMarkSeen = { cvm.markSeen(d[0], d[1]) }, onBack = { detail = null },
-            suspects = cvm.suspectUsers.collectAsState().value, trusted = cvm.trustedUsers.collectAsState().value,
-            onToggleSuspect = cvm::toggleSuspect, onToggleTrusted = cvm::toggleTrusted,
-            loggedIn = cvm.loggedIn.collectAsState().value, commentState = cvm.commentState.collectAsState().value,
+        SettingsScreen(
+            loggedIn = cvm.loggedIn.collectAsState().value,
             onLogin = { try { ctx.startActivity(cvm.loginIntent()) } catch (_: android.content.ActivityNotFoundException) {} },
-            onLogout = cvm::logout, onComment = { cvm.sendComment(d[0], it) }, onCommentReset = cvm::resetComment,
+            onLogout = cvm::logout, onBack = { showSettings = false },
+        )
+    } else if (id == null && !showAreas && d == null) {
+        ChangesetsScreen(cvm, onOpen = { detail = listOf(it.id, it.areaId) }, onAreas = { showAreas = true }, onSettings = { showSettings = true })
+    } else if (d != null) {
+        ChangesetDetailScreen(
+            cvm, id = d[0], areaId = d[1], area = areas?.firstOrNull { it.id == d[1] }, onBack = { detail = null },
+            onLogin = { try { ctx.startActivity(cvm.loginIntent()) } catch (_: android.content.ActivityNotFoundException) {} },
         )
     } else if (id == null) {
         AreasScreen(
             areas = areas,
+            unseen = vm.unseen.collectAsState().value,
             onAdd = { editing = NEW_AREA },
+            onWatchUser = vm::watchUser,
             onEdit = { editing = it.id },
             onToggle = { a, on -> vm.setEnabled(a.id, on) },
             onDelete = { vm.delete(it.id) },

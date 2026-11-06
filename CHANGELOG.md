@@ -13,3 +13,12 @@
 ## Unreleased
 - Search box in the list (user, comment, editor, id); "Only my areas" filter off = global search by OSM user name or changeset id.
 - Opens openstreetmap.org/changeset/ID links from other apps and browsers.
+- OSMCha-style flags (many changes, no comment, mass deletion, new mapper, previously blocked, suspect user) and trusted/suspect user lists.
+- Filters in a bottom sheet: flagged only, hide trusted, size, date, editor, hashtag, type of change (from the changeset counts).
+- Changeset detail: relations, full list of changed elements with tag diffs, history and "Edit in iD" links, discussion.
+- OSM login (OAuth2 PKCE, no secret in the app) to comment on changesets; token encrypted with the Android Keystore.
+- Author card with profile numbers and "Recent activity" (HDYC-like summary of the last 100 changesets).
+- Watch OSM users anywhere in the world, not only areas.
+- Area editor: search municipalities and places with Nominatim; an area can follow the real boundary, and verification uses it.
+- Redesigned list, detail, areas and area editor; footprint glyph showing where a changeset falls in the area.
+- Database migrations keep existing areas (versions 2 to 5).

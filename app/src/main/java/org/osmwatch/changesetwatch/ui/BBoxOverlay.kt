@@ -18,9 +18,9 @@ class BBoxOverlay(
     private val onChange: (BBox) -> Unit,
 ) : Overlay() {
 
-    private val fill = Paint().apply { color = 0x332196F3; style = Paint.Style.FILL }
-    private val stroke = Paint().apply { color = 0xFF1565C0.toInt(); style = Paint.Style.STROKE; strokeWidth = 2f * density; isAntiAlias = true }
-    private val handle = Paint().apply { color = 0xFF1565C0.toInt(); style = Paint.Style.FILL; isAntiAlias = true }
+    private val fill = Paint().apply { color = 0x332563EB; style = Paint.Style.FILL }
+    private val stroke = Paint().apply { color = 0xFF2563EB.toInt(); style = Paint.Style.STROKE; strokeWidth = 2f * density; isAntiAlias = true }
+    private val handle = Paint().apply { color = 0xFF2563EB.toInt(); style = Paint.Style.FILL; isAntiAlias = true }
 
     private var corner = -1 // 0 NO, 1 NE, 2 SE, 3 SO; -1 nessuno
     private var moving = false

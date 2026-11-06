@@ -53,6 +53,9 @@ object ChangesetParser {
             changesCount = s("changes_count")?.toIntOrNull(),
             commentsCount = s("comments_count")?.toIntOrNull(),
             tags = emptyMap(),
+            createdCount = s("created_count")?.toIntOrNull(),
+            modifiedCount = s("modified_count")?.toIntOrNull(),
+            deletedCount = s("deleted_count")?.toIntOrNull(),
         )
     }
 }

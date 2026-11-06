@@ -27,6 +27,10 @@ class ChangesetRepository(
      */
     suspend fun refreshLatest(area: WatchArea, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<ChangesetRow> {
         val now = System.currentTimeMillis()
+        if (area.watchUser != null) {
+            val fetched = withContext(Dispatchers.IO) { client.fetchChangesetsByUser(area.watchUser, 100) }
+            return storeUser(area, fetched.map { it.toRow(area.id, Verdict.CONFIRMED, now) }, now)
+        }
         val fetched = withContext(Dispatchers.IO) { client.fetchChangesets(area.bbox) }
         store(area, fetched.map { it.toRow(area.id, Verdict.PENDING, now) }, now)
         return verifyPending(area, onProgress)
@@ -40,6 +44,10 @@ class ChangesetRepository(
         val last = area.lastCheckedAt ?: return refreshLatest(area).let { emptyList() }
         val now = System.currentTimeMillis()
         val since = java.time.Instant.ofEpochMilli(last - overlapMs)
+        if (area.watchUser != null) {
+            val byUser = withContext(Dispatchers.IO) { client.fetchChangesetsByUser(area.watchUser, 100, since) }
+            return storeUser(area, byUser.map { it.toRow(area.id, Verdict.CONFIRMED, now) }, now)
+        }
         val fetched = withContext(Dispatchers.IO) {
             fetchAllPages { before -> client.fetchChangesets(area.bbox, closedAfter = since, createdBefore = before) }
         }
@@ -60,7 +68,7 @@ class ChangesetRepository(
             onProgress(i, pending.size)
             val bbox = if (row.bboxMinLat != null) org.osmwatch.changesetwatch.domain.BBox(row.bboxMinLat, row.bboxMinLon!!, row.bboxMaxLat!!, row.bboxMaxLon!!) else null
             val verdict = try {
-                withContext(Dispatchers.IO) { verifier.verify(row.id, bbox, row.changesCount, area.bbox) }
+                withContext(Dispatchers.IO) { verifier.verify(row.id, bbox, row.changesCount, area.shape) }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -74,9 +82,24 @@ class ChangesetRepository(
         return confirmed
     }
 
+    /** Monitoraggio utente: niente verifica geometrica (valgono tutti); ritorna solo le righe davvero nuove. */
+    private suspend fun storeUser(area: WatchArea, rows: List<ChangesetRow>, checkedAt: Long): List<ChangesetRow> {
+        val inserted = db.changesetDao().insertAll(rows)
+        fillCounts(rows)
+        db.areaDao().setLastChecked(area.id, checkedAt)
+        return rows.filterIndexed { i, _ -> inserted[i] != -1L }
+    }
+
     /** Inserisce e aggiorna lastCheckedAt (l'istante *prima* della richiesta). */
     private suspend fun store(area: WatchArea, rows: List<ChangesetRow>, checkedAt: Long) {
         db.changesetDao().insertAll(rows)
+        fillCounts(rows)
         db.areaDao().setLastChecked(area.id, checkedAt)
+    }
+
+    private suspend fun fillCounts(rows: List<ChangesetRow>) = rows.forEach { r ->
+        if (r.createdCount != null && r.modifiedCount != null && r.deletedCount != null) {
+            db.changesetDao().fillCounts(r.id, r.createdCount, r.modifiedCount, r.deletedCount)
+        }
     }
 }

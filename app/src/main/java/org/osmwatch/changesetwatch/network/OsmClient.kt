@@ -10,10 +10,12 @@ import okhttp3.Request
 import okhttp3.Response
 import org.osmwatch.changesetwatch.domain.BBox
 import org.osmwatch.changesetwatch.domain.Changeset
+import org.osmwatch.changesetwatch.domain.ChangesetComment
 import org.osmwatch.changesetwatch.domain.ElementData
 import org.osmwatch.changesetwatch.domain.ElementSource
 import org.osmwatch.changesetwatch.domain.ElementType
 import org.osmwatch.changesetwatch.domain.LatLon
+import org.osmwatch.changesetwatch.domain.UserInfo
 import org.osmwatch.changesetwatch.domain.VersionedId
 import org.osmwatch.changesetwatch.domain.OsmChangeSummary
 
@@ -47,9 +49,31 @@ class OsmClient(
     fun fetchChangeset(id: Long): Changeset? =
         execute("$baseUrl/changeset/$id".toHttpUrl()) { ChangesetParser.parse(it.body!!.byteStream()).firstOrNull() }
 
-    fun fetchChangesetsByUser(displayName: String, limit: Int = 50): List<Changeset> =
+    fun fetchDiscussion(id: Long): List<ChangesetComment> =
+        execute("$baseUrl/changeset/$id".toHttpUrl().newBuilder().addQueryParameter("include_discussion", "true").build()) {
+            DiscussionParser.parse(it.body!!.byteStream())
+        }
+
+    /** Profilo pubblico dell'utente (nessun login); null se l'utente non esiste più o è anonimizzato. */
+    fun fetchUser(uid: Long): UserInfo? =
+        try {
+            execute("$baseUrl/user/$uid".toHttpUrl()) { UserParser.parse(it.body!!.byteStream()) }
+        } catch (e: OsmHttpException) {
+            if (e.code == 404 || e.code == 410) null else throw e
+        }
+
+    /** [closedAfter]: solo chiusi dopo T1 o ancora aperti (`time=T1`). */
+    fun fetchChangesetsByUser(displayName: String, limit: Int = 50, closedAfter: Instant? = null): List<Changeset> =
         execute("$baseUrl/changesets".toHttpUrl().newBuilder()
-            .addQueryParameter("display_name", displayName).addQueryParameter("limit", limit.toString()).build()) {
+            .addQueryParameter("display_name", displayName).addQueryParameter("limit", limit.toString())
+            .apply { if (closedAfter != null) addQueryParameter("time", closedAfter.toString()) }.build()) {
+            ChangesetParser.parse(it.body!!.byteStream())
+        }
+
+    /** Ultimi changeset dell'utente per id numerico (stabile anche se cambia nome). */
+    fun fetchChangesetsByUid(uid: Long, limit: Int = 100): List<Changeset> =
+        execute("$baseUrl/changesets".toHttpUrl().newBuilder()
+            .addQueryParameter("user", uid.toString()).addQueryParameter("limit", limit.toString()).build()) {
             ChangesetParser.parse(it.body!!.byteStream())
         }
 

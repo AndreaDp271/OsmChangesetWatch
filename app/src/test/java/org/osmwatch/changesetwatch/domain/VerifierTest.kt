@@ -117,4 +117,18 @@ class BeforeGeometryTest {
         assertEquals(listOf(19.0), g.beforePoints.map { it.lat }) // nodo isolato spostato
         assertEquals(0, GeometryResolver.resolve(change, src).beforeLines.size) // di default niente "prima"
     }
+
+    @Test fun boundaryRejectsNodeInBboxButOutsidePolygon() {
+        // triangolo: la metà in alto a destra della bbox è fuori
+        val tri = AreaShape(BBox(0.0, 0.0, 10.0, 10.0), listOf(listOf(LatLon(0.0, 0.0), LatLon(0.0, 10.0), LatLon(10.0, 0.0))))
+        val outside = OsmChangeSummary(listOf(ChangedNode(1, MODIFY, 9.0, 9.0)), emptyList(), 0)
+        val inside = OsmChangeSummary(listOf(ChangedNode(1, MODIFY, 1.0, 1.0)), emptyList(), 0)
+        fun v(c: OsmChangeSummary) = ChangesetVerifier(2000, { c }, object : ElementSource {
+            override fun nodes(ids: List<VersionedId>) = emptyMap<Long, LatLon>()
+            override fun ways(ids: List<VersionedId>) = emptyMap<Long, List<Long>>()
+            override fun details(type: ElementType, ids: List<VersionedId>) = emptyMap<Long, ElementData>()
+        }).verify(1, BBox(0.5, 0.5, 9.5, 9.5), 1, tri)
+        assertEquals(Verdict.OUTSIDE, v(outside))
+        assertEquals(Verdict.CONFIRMED, v(inside))
+    }
 }

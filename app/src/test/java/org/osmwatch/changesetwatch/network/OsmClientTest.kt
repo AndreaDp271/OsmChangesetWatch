@@ -34,6 +34,15 @@ class OsmClientTest {
         assertEquals("100", u.queryParameter("limit"))
     }
 
+    @Test fun userRequest_hasNameAndTime() {
+        server.enqueue(MockResponse().setBody(empty))
+        client().fetchChangesetsByUser("Anna B", 100, Instant.parse("2026-01-01T00:00:00Z"))
+        val u = server.takeRequest().requestUrl!!
+        assertEquals("Anna B", u.queryParameter("display_name"))
+        assertEquals("2026-01-01T00:00:00Z", u.queryParameter("time"))
+        assertEquals("100", u.queryParameter("limit"))
+    }
+
     @Test fun retries429HonoringRetryAfter_thenSucceeds() {
         server.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "7"))
         server.enqueue(MockResponse().setResponseCode(503))

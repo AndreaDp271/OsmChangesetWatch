@@ -13,7 +13,9 @@ class ChangesetVerifier(
     private val fetchChange: (Long) -> OsmChangeSummary,
     private val src: ElementSource,
 ) {
-    fun verify(id: Long, csBbox: BBox?, changesCount: Int?, area: BBox): Verdict {
+    fun verify(id: Long, csBbox: BBox?, changesCount: Int?, area: BBox): Verdict = verify(id, csBbox, changesCount, AreaShape(area))
+
+    fun verify(id: Long, csBbox: BBox?, changesCount: Int?, area: AreaShape): Verdict {
         if (csBbox != null) {
             if (!area.intersects(csBbox)) return Verdict.OUTSIDE
             if (area.containsBox(csBbox)) return Verdict.CONFIRMED

@@ -18,6 +18,10 @@ data class Changeset(
     val changesCount: Int?,
     val commentsCount: Int?,
     val tags: Map<String, String>,
+    /** Dall'intestazione (`created_count` ecc.): null se il server non li fornisce. */
+    val createdCount: Int? = null,
+    val modifiedCount: Int? = null,
+    val deletedCount: Int? = null,
 ) {
     val comment: String? get() = tags["comment"]
     val createdBy: String? get() = tags["created_by"]
@@ -63,3 +67,12 @@ data class OsmChangeSummary(
 ) {
     val wayCount: Int get() = ways.size
 }
+
+/** Commento nella discussione di un changeset (solo quelli visibili). */
+data class ChangesetComment(val user: String?, val date: Instant?, val text: String)
+
+/** Profilo pubblico OSM dell'autore (`GET /user/ID`); i campi mancanti sono null. */
+data class UserInfo(
+    val name: String?, val createdAt: Instant?, val changesets: Int?, val blocksReceived: Int?,
+    val roles: List<String> = emptyList(), val traces: Int? = null,
+)

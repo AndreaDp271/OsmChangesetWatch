@@ -9,6 +9,12 @@ class FlagsTest {
         assertEquals(listOf(Flag.MANY_CHANGES, Flag.NO_COMMENT, Flag.SUSPECT_USER), Flags.header(500, " ", "bad", setOf("bad")))
     }
 
+    @Test fun userFlags() {
+        assertEquals(emptyList<Flag>(), Flags.fromUser(null))
+        assertEquals(emptyList<Flag>(), Flags.fromUser(UserInfo("a", null, 10, 0)))
+        assertEquals(listOf(Flag.NEW_MAPPER, Flag.PREVIOUSLY_BLOCKED), Flags.fromUser(UserInfo("a", null, 9, 1)))
+    }
+
     private fun nodes(del: Int, other: Int) = OsmChangeSummary(
         List(del) { ChangedNode(it.toLong(), ChangeAction.DELETE, null, null) } +
             List(other) { ChangedNode(1000L + it, ChangeAction.MODIFY, 0.0, 0.0) },

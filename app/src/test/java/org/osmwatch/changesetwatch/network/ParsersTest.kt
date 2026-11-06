@@ -24,6 +24,9 @@ class ParsersTest {
         assertEquals("added sidewalks and crossings", c.comment)
         assertEquals("iD 2.42.3", c.createdBy)
         assertEquals("survey", list[2].source)
+        assertEquals(41, c.createdCount)
+        assertEquals(9, c.modifiedCount)
+        assertEquals(0, c.deletedCount)
         assertNull(c.source)
     }
 

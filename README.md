@@ -33,6 +33,8 @@ Download **uno alla volta**, 1 s di pausa, al massimo 25 verifiche per area e pe
 ## Uso dell'API OSM (policy)
 Solo lettura anonima di `api.openstreetmap.org/api/0.6`. User-Agent `OSMChangesetWatch/<versione> (<URL repo>)` in `OsmConfig.USER_AGENT` (da tenere allineato a `versionName`). Una richiesta alla volta, pause tra richieste, timeout 15/30 s, **backoff esponenziale** su 429/5xx e rispetto di `Retry-After`. Nessun polling aggressivo: intervallo minimo 15 min. [Policy ufficiale](https://operations.osmfoundation.org/policies/api/).
 
+La ricerca di comuni e luoghi nell'editor delle aree usa [Nominatim](https://nominatim.openstreetmap.org/) (stesso User-Agent): solo su invio esplicito, niente autocompletamento, al massimo una richiesta al secondo, come chiede la [policy di Nominatim](https://operations.osmfoundation.org/policies/nominatim/).
+
 ## Scelta della mappa
 osmdroid 6.1.20 (Apache-2.0, nessuna dipendenza transitiva, solo Java) invece di MapLibre Native (librerie native pesanti, più rischio per F-Droid).
 

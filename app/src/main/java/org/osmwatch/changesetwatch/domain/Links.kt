@@ -6,6 +6,13 @@ object Links {
     const val ACHAVI = "https://overpass-api.de/achavi/?changeset={id}"
     const val OSMCHA = "https://osmcha.org/changesets/{id}"
 
+    private fun path(t: ElementType) = t.name.lowercase()
+
+    /** Pagina dell'elemento con la cronologia (da cui si vede e si può annullare una modifica). */
+    fun elementHistory(t: ElementType, id: Long) = "https://www.openstreetmap.org/${path(t)}/$id/history"
+
+    fun editInId(t: ElementType, id: Long) = "https://www.openstreetmap.org/edit?editor=id&${path(t)}=$id"
+
     fun url(template: String, changesetId: Long) = template.replace("{id}", changesetId.toString())
 
     /** Id da un link `.../changeset/123` (o `/changesets/123`, anche con coda `/...` o `?...`), altrimenti null. */

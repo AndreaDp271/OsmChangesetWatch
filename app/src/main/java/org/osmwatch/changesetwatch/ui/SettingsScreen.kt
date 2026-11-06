@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
@@ -70,7 +71,7 @@ private object SetColors { // stessi colori di gruppo di ParkMap
 private fun dirSize(f: File): Long = if (f.isFile) f.length() else f.listFiles()?.sumOf { dirSize(it) } ?: 0L
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(loggedIn: Boolean, onLogin: () -> Unit, onLogout: () -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
@@ -92,6 +93,14 @@ fun SettingsScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             AppCard(version)
+
+            Group(stringResource(R.string.group_account)) {
+                Item(
+                    Icons.Filled.AccountCircle, SetColors.data, stringResource(R.string.group_account),
+                    stringResource(if (loggedIn) R.string.account_logged_in else R.string.account_logged_out),
+                    trailing = { TextButton(onClick = if (loggedIn) onLogout else onLogin) { Text(stringResource(if (loggedIn) R.string.logout_osm else R.string.account_login)) } },
+                )
+            }
 
             Group(stringResource(R.string.group_look)) {
                 Item(Icons.Filled.DarkMode, SetColors.look, stringResource(R.string.theme), stringResource(R.string.theme_desc))

@@ -38,9 +38,11 @@ import org.osmwatch.changesetwatch.domain.ElementDiffer
 import org.osmwatch.changesetwatch.domain.ElementRef
 import org.osmwatch.changesetwatch.domain.ElementType
 import org.osmwatch.changesetwatch.domain.Flags
+import org.osmwatch.changesetwatch.domain.RowTags
 import org.osmwatch.changesetwatch.domain.GeometryResolver
 import org.osmwatch.changesetwatch.domain.LatLon
 import org.osmwatch.changesetwatch.domain.OsmChangeSummary
+import org.osmwatch.changesetwatch.domain.UserInfo
 import org.osmwatch.changesetwatch.domain.Verdict
 import org.osmwatch.changesetwatch.domain.VersionedId
 import org.osmwatch.changesetwatch.network.OsmClient
@@ -60,7 +62,7 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     val showAll = MutableStateFlow(false)
     val onlyFlagged = MutableStateFlow(false)
     val hideTrusted = MutableStateFlow(false)
-    /** Valori scelti toccando il chip in ciclo: 0 = nessun filtro. */
+    /** 0 = nessun filtro; valori in [MIN_CHANGES_STEPS] e [MAX_AGE_STEPS]. */
     val minChanges = MutableStateFlow(0)
     val maxAgeHours = MutableStateFlow(0)
     val suspectUsers = MutableStateFlow(prefs.suspectUsers)
@@ -77,7 +79,7 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     /** Testo di ricerca: utente, commento, editor o id (filtro locale sulla lista). */
     val query = MutableStateFlow("")
 
-    val changesets: StateFlow<List<ChangesetRow>> =
+    private val candidates: Flow<List<ChangesetRow>> =
         combine(areaFilter, includeSeen, showAll) { a, s, all -> Triple(a, s, all) }
             .flatMapLatest { (a, s, all) ->
                 val verdicts = if (all) Verdict.entries.map { it.name } else listOf(Verdict.CONFIRMED.name)
@@ -91,7 +93,7 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
             }
             .let { base -> combine(base, onlyFlagged, hideTrusted, suspectUsers, trustedUsers) { rows, f, h, s, t ->
                 rows.filter { r ->
-                    (!f || Flags.header(r.changesCount, r.comment, r.user, s).isNotEmpty()) && (!h || r.user !in t)
+                    (!f || (Flags.header(r.changesCount, r.comment, r.user, s) + Flags.fromCounts(r.createdCount, r.modifiedCount, r.deletedCount)).isNotEmpty()) && (!h || r.user !in t)
                 }
             } }
             .combine(minChanges) { rows, n -> if (n == 0) rows else rows.filter { (it.changesCount ?: 0) >= n } }
@@ -99,10 +101,41 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
                 val from = System.currentTimeMillis() - h * 3_600_000L
                 if (h == 0) rows else rows.filter { it.createdAt >= from }
             }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun cycleMinChanges() { minChanges.update { MIN_CHANGES_STEPS[(MIN_CHANGES_STEPS.indexOf(it) + 1) % MIN_CHANGES_STEPS.size] } }
-    fun cycleMaxAge() { maxAgeHours.update { MAX_AGE_STEPS[(MAX_AGE_STEPS.indexOf(it) + 1) % MAX_AGE_STEPS.size] } }
+    val editorFilter = MutableStateFlow<String?>(null)
+    val hashtagFilter = MutableStateFlow<String?>(null)
+    val kindFilter = MutableStateFlow(org.osmwatch.changesetwatch.domain.ChangeKind.ANY)
+
+    /** Voci dei menu: calcolate prima di questi due filtri, così scegliere un editor non nasconde gli altri. */
+    val editors: StateFlow<List<String>> = candidates
+        .map { rows -> rows.mapNotNull { RowTags.editor(it.createdBy) }.distinct().sorted() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val hashtags: StateFlow<List<String>> = candidates
+        .map { rows -> rows.flatMap { RowTags.hashtags(it.comment) }.distinct().sorted() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val changesets: StateFlow<List<ChangesetRow>> =
+        combine(candidates, editorFilter, hashtagFilter, kindFilter) { rows, e, h, k ->
+            rows.filter {
+                (e == null || RowTags.editor(it.createdBy) == e) && (h == null || h in RowTags.hashtags(it.comment)) &&
+                    k.matches(it.createdCount, it.modifiedCount, it.deletedCount)
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Torna alla lista di default: solo changeset verificati nell'area, nessun altro filtro (area e ricerca restano). */
+    fun resetFilters() {
+        includeSeen.value = true; showAll.value = false; onlyFlagged.value = false; hideTrusted.value = false
+        minChanges.value = 0; maxAgeHours.value = 0; editorFilter.value = null; hashtagFilter.value = null
+        kindFilter.value = org.osmwatch.changesetwatch.domain.ChangeKind.ANY
+    }
+
+    /** Segui un utente da qualsiasi changeset; ignora i doppioni. */
+    fun watchUser(name: String) {
+        if (areas.value.any { it.watchUser == name }) return
+        viewModelScope.launch {
+            db.areaDao().upsert(WatchArea(name = "@$name", minLat = 0.0, minLon = 0.0, maxLat = 0.0, maxLon = 0.0, watchUser = name))
+        }
+    }
 
     fun toggleSuspect(user: String) {
         suspectUsers.update { if (user in it) it - user else it + user }
@@ -240,6 +273,70 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // --- profilo dell'autore (pubblico) ---
+    val userInfo = MutableStateFlow<UserInfo?>(null)
+    private val userCache = HashMap<Long, UserInfo?>()
+    private var userFor = 0L
+
+    fun loadUser(uid: Long?) {
+        userFor = uid ?: 0L
+        if (uid == null) { userInfo.value = null; return }
+        if (userCache.containsKey(uid)) { userInfo.value = userCache[uid]; return }
+        userInfo.value = null
+        viewModelScope.launch {
+            try {
+                val u = withContext(Dispatchers.IO) { client.fetchUser(uid) }
+                userCache[uid] = u
+                if (userFor == uid) userInfo.value = u
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) { /* resta null: niente profilo */ }
+        }
+    }
+
+    // --- attività recente dell'autore (stile HDYC, solo su richiesta) ---
+    val activity = MutableStateFlow<org.osmwatch.changesetwatch.domain.UserActivity?>(null)
+    val activityLoading = MutableStateFlow(false)
+    private val activityCache = HashMap<Long, org.osmwatch.changesetwatch.domain.UserActivity?>()
+    private var activityFor = 0L
+
+    fun loadActivity(uid: Long) {
+        activityFor = uid
+        if (activityCache.containsKey(uid)) { activity.value = activityCache[uid]; activityLoading.value = false; return }
+        activity.value = null
+        activityLoading.value = true
+        viewModelScope.launch {
+            try {
+                val list = withContext(Dispatchers.IO) { client.fetchChangesetsByUid(uid, 100) }
+                val areaBoxes = areas.value.filter { it.watchUser == null }.map { it.bbox }
+                val a = org.osmwatch.changesetwatch.domain.UserActivityCalc.of(list, areaBoxes)
+                activityCache[uid] = a
+                if (activityFor == uid) activity.value = a
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) { /* resta null: la sezione mostra "non disponibile" */ }
+            finally { if (activityFor == uid) activityLoading.value = false }
+        }
+    }
+
+    // --- discussione del changeset (pubblica, senza login) ---
+    /** null = in caricamento o non disponibile. */
+    val discussion = MutableStateFlow<List<org.osmwatch.changesetwatch.domain.ChangesetComment>?>(null)
+    private var discussionFor = 0L
+
+    fun loadDiscussion(id: Long) {
+        if (discussionFor != id) discussion.value = null
+        discussionFor = id
+        viewModelScope.launch {
+            try {
+                val list = withContext(Dispatchers.IO) { client.fetchDiscussion(id) }
+                if (discussionFor == id) discussion.value = list
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) { /* resta null: la sezione commenti non compare */ }
+        }
+    }
+
     // --- login OSM e commenti ---
     val loggedIn = MutableStateFlow(tokens.token != null)
     val commentState = MutableStateFlow<CommentState>(CommentState.Idle)
@@ -255,12 +352,23 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         return Intent(Intent.ACTION_VIEW, Uri.parse(OsmAuth.authorizeUrl(OsmAuth.challenge(verifier), state)))
     }
 
+    private fun loginFailed(detail: String) {
+        android.util.Log.w("OsmLogin", detail)
+        val msg = "${str(R.string.login_failed)}: $detail"
+        error.value = msg
+        android.widget.Toast.makeText(getApplication(), msg, android.widget.Toast.LENGTH_LONG).show()
+    }
+
     fun handleOAuth(uri: Uri) {
+        android.util.Log.i("OsmLogin", "redirect: ${uri.scheme}://${uri.host} error=${uri.getQueryParameter("error")} hasCode=${uri.getQueryParameter("code") != null}")
         val verifier = prefs.pendingVerifier
         val ok = verifier != null && uri.getQueryParameter("state") == prefs.pendingState
         prefs.pendingVerifier = null; prefs.pendingState = null
         val code = uri.getQueryParameter("code")
-        if (!ok || code == null) { error.value = str(R.string.login_failed); return }
+        if (!ok || code == null) {
+            loginFailed(uri.getQueryParameter("error_description") ?: uri.getQueryParameter("error") ?: if (verifier == null) "no pending login" else "state mismatch")
+            return
+        }
         viewModelScope.launch {
             try {
                 val token = withContext(Dispatchers.IO) { OsmAuth.exchange(authHttp, code, verifier!!) }
@@ -269,7 +377,7 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error.value = "${str(R.string.login_failed)}: ${e.message ?: e.javaClass.simpleName}"
+                loginFailed(e.message ?: e.javaClass.simpleName)
             }
         }
     }
@@ -283,6 +391,7 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             commentState.value = try {
                 withContext(Dispatchers.IO) { OsmAuth.postComment(authHttp, token, changesetId, text.trim()) }
+                loadDiscussion(changesetId)
                 CommentState.Done
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -338,8 +447,8 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
 /** areaId fittizio dei changeset aperti da link e non appartenenti a nessuna area. */
 const val EXTERNAL = -1L
 
-private val MIN_CHANGES_STEPS = listOf(0, 10, 100, 500)
-private val MAX_AGE_STEPS = listOf(0, 24, 168) // ore: tutto, 24 h, 7 giorni
+val MIN_CHANGES_STEPS = listOf(0, 10, 100, 500)
+val MAX_AGE_STEPS = listOf(0, 24, 168) // ore: tutto, 24 h, 7 giorni
 
 sealed interface GeoState {
     data object Loading : GeoState
