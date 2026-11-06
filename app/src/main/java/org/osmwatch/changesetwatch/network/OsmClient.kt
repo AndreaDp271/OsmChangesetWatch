@@ -114,7 +114,7 @@ class OsmElementSource(private val client: OsmClient, private val pauseMs: Long 
         details(ElementType.WAY, ids).mapValues { it.value.refs }
 
     override fun details(type: ElementType, ids: List<VersionedId>): Map<Long, ElementData> {
-        val kind = if (type == ElementType.NODE) "nodes" else "ways"
+        val kind = when (type) { ElementType.NODE -> "nodes"; ElementType.WAY -> "ways"; ElementType.RELATION -> "relations" }
         val out = HashMap<Long, ElementData>()
         ids.chunked(100).forEachIndexed { i, chunk ->
             if (i > 0) Thread.sleep(pauseMs)

@@ -10,6 +10,8 @@ data class ElementDiff(
     val movedMeters: Double?,
     val nodesAdded: Int,
     val nodesRemoved: Int,
+    val membersAdded: Int,
+    val membersRemoved: Int,
     val previousMissing: Boolean,
 )
 
@@ -24,10 +26,14 @@ object ElementDiffer {
         val moved = if (ref.type == ElementType.NODE && current?.at != null && previous?.at != null) distanceMeters(previous.at, current.at) else null
         val oldRefs = previous?.refs.orEmpty().toSet()
         val newRefs = current?.refs.orEmpty().toSet()
+        val oldMembers = previous?.members.orEmpty().toSet()
+        val newMembers = current?.members.orEmpty().toSet()
         return ElementDiff(
             ref, action, tags, moved?.takeIf { it >= 0.5 },
             nodesAdded = if (previous == null) 0 else (newRefs - oldRefs).size,
             nodesRemoved = if (previous == null) 0 else (oldRefs - newRefs).size,
+            membersAdded = if (previous == null) 0 else (newMembers - oldMembers).size,
+            membersRemoved = if (previous == null) 0 else (oldMembers - newMembers).size,
             previousMissing = action != ChangeAction.CREATE && previous == null,
         )
     }

@@ -41,6 +41,15 @@ import androidx.compose.ui.unit.dp
 import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.ChangesetRow
 import org.osmwatch.changesetwatch.data.WatchArea
+import org.osmwatch.changesetwatch.domain.Flag
+import org.osmwatch.changesetwatch.domain.Flags
+
+fun flagLabel(f: Flag): Int = when (f) {
+    Flag.MANY_CHANGES -> R.string.flag_many_changes
+    Flag.NO_COMMENT -> R.string.flag_no_comment
+    Flag.SUSPECT_USER -> R.string.flag_suspect_user
+    Flag.MASS_DELETE -> R.string.flag_mass_delete
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +64,15 @@ fun ChangesetsScreen(
     areaFilter: Long?,
     includeSeen: Boolean,
     showAll: Boolean,
+    onlyFlagged: Boolean,
+    onOnlyFlagged: (Boolean) -> Unit,
+    hideTrusted: Boolean,
+    onHideTrusted: (Boolean) -> Unit,
+    suspects: Set<String>,
+    minChanges: Int,
+    onMinChanges: () -> Unit,
+    maxAgeHours: Int,
+    onMaxAge: () -> Unit,
     progress: String?,
     refreshing: Boolean,
     error: String?,
@@ -97,6 +115,32 @@ fun ChangesetsScreen(
                     FilterChip(
                         selected = showAll, onClick = { onShowAll(!showAll) },
                         label = { Text(stringResource(R.string.show_unverified)) }, modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = onlyFlagged, onClick = { onOnlyFlagged(!onlyFlagged) },
+                        label = { Text(stringResource(R.string.only_flagged)) }, modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = hideTrusted, onClick = { onHideTrusted(!hideTrusted) },
+                        label = { Text(stringResource(R.string.hide_trusted)) }, modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = minChanges > 0, onClick = onMinChanges,
+                        label = { Text(if (minChanges == 0) stringResource(R.string.min_changes_any) else stringResource(R.string.min_changes_n, minChanges)) },
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = maxAgeHours > 0, onClick = onMaxAge,
+                        label = { Text(stringResource(when (maxAgeHours) { 24 -> R.string.age_24h; 168 -> R.string.age_7d; else -> R.string.age_any })) },
+                        modifier = Modifier.padding(end = 8.dp),
                     )
                 }
                 item {
@@ -144,7 +188,9 @@ fun ChangesetsScreen(
                             },
                             supportingContent = {
                                 val ago = DateUtils.getRelativeTimeSpanString(r.createdAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)
+                                val flags = Flags.header(r.changesCount, r.comment, r.user, suspects).map { stringResource(flagLabel(it)) }.joinToString(", ")
                                 Text("${r.createdBy ?: "?"} · $ago · ${androidx.compose.ui.res.pluralStringResource(R.plurals.changes_n, r.changesCount ?: 0, r.changesCount ?: 0)}", maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                if (flags.isNotEmpty()) Text("⚑ $flags", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
                             },
                             trailingContent = { if (r.areaId != EXTERNAL) Text(r.verdict.name, style = MaterialTheme.typography.labelSmall) },
                         )

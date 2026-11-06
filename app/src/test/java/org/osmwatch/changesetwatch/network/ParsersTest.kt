@@ -51,5 +51,9 @@ class ParsersTest {
         assertEquals(41.9, s.nodes[1].lat!!, 1e-9)
         assertEquals(ChangeAction.DELETE, s.nodes[1].action)
         assertEquals(1, s.relationCount)
+        val r = s.relations.single()
+        assertEquals(99L, r.id)
+        assertEquals(4, r.version)
+        assertEquals(listOf(org.osmwatch.changesetwatch.domain.Member("way", 5, "")), r.members)
     }
 }

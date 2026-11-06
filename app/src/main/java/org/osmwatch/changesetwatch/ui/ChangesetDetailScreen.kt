@@ -55,6 +55,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.ChangesetRow
+import org.osmwatch.changesetwatch.domain.Flags
 import org.osmwatch.changesetwatch.domain.Links
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,7 +63,19 @@ import org.osmwatch.changesetwatch.domain.Links
 fun ChangesetDetailScreen(
     row: ChangesetRow?, areaName: String?, geo: GeoState, diff: DiffState?, onLoadGeometry: (ChangesetRow) -> Unit,
     onElementTap: (ElementRef) -> Unit, onDismissDiff: () -> Unit, onMarkSeen: () -> Unit, onBack: () -> Unit,
+    suspects: Set<String>, trusted: Set<String>, onToggleSuspect: (String) -> Unit, onToggleTrusted: (String) -> Unit,
+    loggedIn: Boolean, commentState: CommentState, onLogin: () -> Unit, onLogout: () -> Unit,
+    onComment: (String) -> Unit, onCommentReset: () -> Unit,
 ) {
+    var showComment by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val ctx = LocalContext.current
+    LaunchedEffect(commentState) {
+        if (commentState is CommentState.Done) {
+            showComment = false; onCommentReset()
+            android.widget.Toast.makeText(ctx, R.string.comment_sent, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    if (showComment && loggedIn) CommentDialog(commentState, onComment, onLogout) { showComment = false; onCommentReset() }
     BackHandler(onBack = onBack)
     LaunchedEffect(row?.id) { row?.let(onLoadGeometry) }
     if (diff != null) DiffDialog(diff, onDismissDiff)
@@ -83,7 +96,19 @@ fun ChangesetDetailScreen(
         Column(Modifier.padding(pad).padding(16.dp).verticalScroll(rememberScrollState())) {
             val fmt = { t: Long -> DateFormat.format("yyyy-MM-dd HH:mm", t).toString() }
             Text(row.comment ?: stringResource(R.string.no_comment), style = MaterialTheme.typography.titleMedium)
+            val flags = Flags.header(row.changesCount, row.comment, row.user, suspects) +
+                ((geo as? GeoState.Ready)?.let { Flags.fromChange(it.change) } ?: emptyList())
+            if (flags.isNotEmpty()) Text(
+                "⚑ " + flags.map { stringResource(flagLabel(it)) }.joinToString(", "),
+                color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp),
+            )
             Field(R.string.f_user, "${row.user ?: "?"}${row.uid?.let { " ($it)" } ?: ""}")
+            row.user?.let { u ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    OutlinedButton(onClick = { onToggleSuspect(u) }) { Text(stringResource(if (u in suspects) R.string.unmark_suspect else R.string.mark_suspect)) }
+                    OutlinedButton(onClick = { onToggleTrusted(u) }) { Text(stringResource(if (u in trusted) R.string.unmark_trusted else R.string.mark_trusted)) }
+                }
+            }
             if (row.areaId != EXTERNAL) Field(R.string.f_area, areaName ?: "")
             Field(R.string.f_created, fmt(row.createdAt))
             Field(R.string.f_closed, row.closedAt?.let(fmt) ?: stringResource(R.string.f_open))
@@ -93,14 +118,52 @@ fun ChangesetDetailScreen(
             if (row.bboxMinLat != null) Field(R.string.f_bbox, "%.5f,%.5f → %.5f,%.5f".format(row.bboxMinLon, row.bboxMinLat, row.bboxMaxLon, row.bboxMaxLat))
             if (row.areaId != EXTERNAL) Field(R.string.f_verdict, row.verdict.name)
             ChangesMap(row, geo, onElementTap)
+            (geo as? GeoState.Ready)?.change?.relations?.takeIf { it.isNotEmpty() }?.let { rels ->
+                Text(stringResource(R.string.relations_title, rels.size), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 16.dp))
+                rels.forEach { r ->
+                    val name = r.tags["name"] ?: r.tags["type"] ?: ""
+                    val sign = when (r.action) { ChangeAction.CREATE -> "+"; ChangeAction.MODIFY -> "~"; ChangeAction.DELETE -> "−" }
+                    androidx.compose.material3.TextButton(onClick = { onElementTap(ElementRef(ElementType.RELATION, r.id, r.version)) }) {
+                        Text("$sign #${r.id} $name".trim())
+                    }
+                }
+            }
             Button(onClick = { open(Links.OSM) }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) { Text(stringResource(R.string.open_osm)) }
             OutlinedButton(onClick = { open(Links.ACHAVI) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.open_achavi)) }
             OutlinedButton(onClick = { open(Links.OSMCHA) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.open_osmcha)) }
+            OutlinedButton(
+                onClick = { if (loggedIn) showComment = true else onLogin() }, enabled = row.closedAt != null,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(if (loggedIn) R.string.comment_btn else R.string.login_osm)) }
+            if (row.closedAt == null) Text(stringResource(R.string.comment_open_changeset), style = MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick = onMarkSeen, enabled = !row.seen, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(if (row.seen) R.string.seen else R.string.mark_seen))
             }
         }
     }
+}
+
+@Composable
+private fun CommentDialog(state: CommentState, onSend: (String) -> Unit, onLogout: () -> Unit, onDismiss: () -> Unit) {
+    var text by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    val sending = state is CommentState.Sending
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.comment_title)) },
+        text = {
+            Column {
+                androidx.compose.material3.OutlinedTextField(value = text, onValueChange = { text = it }, enabled = !sending, minLines = 3, modifier = Modifier.fillMaxWidth())
+                if (state is CommentState.Error) Text(state.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { onSend(text) }, enabled = text.isNotBlank() && !sending) { Text(stringResource(R.string.comment_send)) } },
+        dismissButton = {
+            Row {
+                androidx.compose.material3.TextButton(onClick = onLogout) { Text(stringResource(R.string.logout_osm)) }
+                androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+            }
+        },
+    )
 }
 
 @Composable
@@ -169,7 +232,7 @@ private fun Legend(color: Int, label: Int) {
 @Composable
 private fun DiffDialog(state: DiffState, onDismiss: () -> Unit) {
     val ref = when (state) { is DiffState.Loading -> state.ref; is DiffState.Failed -> state.ref; is DiffState.Ready -> state.diff.ref }
-    val kind = stringResource(if (ref.type == ElementType.NODE) R.string.el_node else R.string.el_way)
+    val kind = stringResource(when (ref.type) { ElementType.NODE -> R.string.el_node; ElementType.WAY -> R.string.el_way; ElementType.RELATION -> R.string.el_relation })
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
@@ -198,7 +261,8 @@ private fun DiffBody(d: ElementDiff) {
     if (d.previousMissing) Text(stringResource(R.string.diff_no_previous), style = MaterialTheme.typography.bodySmall)
     d.movedMeters?.let { Text(stringResource(R.string.diff_moved, it.roundToInt()), Modifier.padding(top = 8.dp)) }
     if (d.nodesAdded > 0 || d.nodesRemoved > 0) Text(stringResource(R.string.diff_nodes, d.nodesAdded, d.nodesRemoved), Modifier.padding(top = 8.dp))
-    if (d.tags.isEmpty() && d.movedMeters == null && d.nodesAdded == 0 && d.nodesRemoved == 0 && !d.previousMissing) {
+    if (d.membersAdded > 0 || d.membersRemoved > 0) Text(stringResource(R.string.diff_members, d.membersAdded, d.membersRemoved), Modifier.padding(top = 8.dp))
+    if (d.tags.isEmpty() && d.movedMeters == null && d.nodesAdded == 0 && d.nodesRemoved == 0 && d.membersAdded == 0 && d.membersRemoved == 0 && !d.previousMissing) {
         Text(stringResource(R.string.diff_none), Modifier.padding(top = 8.dp))
     }
     d.tags.forEach { t ->

@@ -22,6 +22,12 @@ import org.osmwatch.changesetwatch.data.AppDatabase
 import org.osmwatch.changesetwatch.data.ChangesetRepository
 import org.osmwatch.changesetwatch.data.ChangesetRow
 import org.osmwatch.changesetwatch.data.Prefs
+import org.osmwatch.changesetwatch.data.TokenStore
+import org.osmwatch.changesetwatch.network.OsmAuth
+import org.osmwatch.changesetwatch.network.OsmHttpException
+import android.content.Intent
+import android.net.Uri
+import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.WatchArea
 import org.osmwatch.changesetwatch.data.toRow
 import org.osmwatch.changesetwatch.domain.ChangeAction
@@ -31,6 +37,7 @@ import org.osmwatch.changesetwatch.domain.ElementDiff
 import org.osmwatch.changesetwatch.domain.ElementDiffer
 import org.osmwatch.changesetwatch.domain.ElementRef
 import org.osmwatch.changesetwatch.domain.ElementType
+import org.osmwatch.changesetwatch.domain.Flags
 import org.osmwatch.changesetwatch.domain.GeometryResolver
 import org.osmwatch.changesetwatch.domain.LatLon
 import org.osmwatch.changesetwatch.domain.OsmChangeSummary
@@ -44,12 +51,20 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
     private val client = OsmClient()
     private val prefs = Prefs(app)
+    private val tokens = TokenStore(app)
     private val repo = ChangesetRepository(db, client, maxChanges = { prefs.maxChanges })
 
     val areaFilter = MutableStateFlow<Long?>(null)
     val includeSeen = MutableStateFlow(true)
     /** false (default): solo i changeset VERIFICATI dentro l'area; true: anche in attesa/incerti/troppo grandi/fuori. */
     val showAll = MutableStateFlow(false)
+    val onlyFlagged = MutableStateFlow(false)
+    val hideTrusted = MutableStateFlow(false)
+    /** Valori scelti toccando il chip in ciclo: 0 = nessun filtro. */
+    val minChanges = MutableStateFlow(0)
+    val maxAgeHours = MutableStateFlow(0)
+    val suspectUsers = MutableStateFlow(prefs.suspectUsers)
+    val trustedUsers = MutableStateFlow(prefs.trustedUsers)
     val refreshing = MutableStateFlow(false)
     /** "Verifica 3/25 …" durante il refresh, null altrimenti. */
     val progress = MutableStateFlow<String?>(null)
@@ -74,7 +89,30 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
                     it.id.toString().contains(t) || listOf(it.user, it.comment, it.createdBy).any { f -> f?.contains(t, ignoreCase = true) == true }
                 }
             }
+            .let { base -> combine(base, onlyFlagged, hideTrusted, suspectUsers, trustedUsers) { rows, f, h, s, t ->
+                rows.filter { r ->
+                    (!f || Flags.header(r.changesCount, r.comment, r.user, s).isNotEmpty()) && (!h || r.user !in t)
+                }
+            } }
+            .combine(minChanges) { rows, n -> if (n == 0) rows else rows.filter { (it.changesCount ?: 0) >= n } }
+            .combine(maxAgeHours) { rows, h ->
+                val from = System.currentTimeMillis() - h * 3_600_000L
+                if (h == 0) rows else rows.filter { it.createdAt >= from }
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun cycleMinChanges() { minChanges.update { MIN_CHANGES_STEPS[(MIN_CHANGES_STEPS.indexOf(it) + 1) % MIN_CHANGES_STEPS.size] } }
+    fun cycleMaxAge() { maxAgeHours.update { MAX_AGE_STEPS[(MAX_AGE_STEPS.indexOf(it) + 1) % MAX_AGE_STEPS.size] } }
+
+    fun toggleSuspect(user: String) {
+        suspectUsers.update { if (user in it) it - user else it + user }
+        prefs.suspectUsers = suspectUsers.value
+    }
+
+    fun toggleTrusted(user: String) {
+        trustedUsers.update { if (user in it) it - user else it + user }
+        prefs.trustedUsers = trustedUsers.value
+    }
 
     /** Changeset aperto da link esterno e non presente in lista: non salvato nel DB (areaId = EXTERNAL). */
     private val external = MutableStateFlow<Map<Long, ChangesetRow>>(emptyMap())
@@ -197,7 +235,72 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         ElementType.WAY -> change.ways.firstOrNull { it.id == ref.id }?.let {
             it.action to if (it.action == ChangeAction.DELETE) null else ElementData(null, it.nodeRefs, it.tags)
         }
+        ElementType.RELATION -> change.relations.firstOrNull { it.id == ref.id }?.let {
+            it.action to if (it.action == ChangeAction.DELETE) null else ElementData(null, emptyList(), it.tags, it.members)
+        }
     }
+
+    // --- login OSM e commenti ---
+    val loggedIn = MutableStateFlow(tokens.token != null)
+    val commentState = MutableStateFlow<CommentState>(CommentState.Idle)
+    private val authHttp = OsmClient.defaultHttp()
+    private fun str(id: Int) = getApplication<Application>().getString(id)
+
+    /** Intent per il browser: apre la pagina di autorizzazione OSM; il ritorno arriva a [handleOAuth]. */
+    fun loginIntent(): Intent {
+        val verifier = OsmAuth.randomToken()
+        val state = OsmAuth.randomToken()
+        prefs.pendingVerifier = verifier
+        prefs.pendingState = state
+        return Intent(Intent.ACTION_VIEW, Uri.parse(OsmAuth.authorizeUrl(OsmAuth.challenge(verifier), state)))
+    }
+
+    fun handleOAuth(uri: Uri) {
+        val verifier = prefs.pendingVerifier
+        val ok = verifier != null && uri.getQueryParameter("state") == prefs.pendingState
+        prefs.pendingVerifier = null; prefs.pendingState = null
+        val code = uri.getQueryParameter("code")
+        if (!ok || code == null) { error.value = str(R.string.login_failed); return }
+        viewModelScope.launch {
+            try {
+                val token = withContext(Dispatchers.IO) { OsmAuth.exchange(authHttp, code, verifier!!) }
+                tokens.token = token
+                loggedIn.value = true
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error.value = "${str(R.string.login_failed)}: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+    }
+
+    fun logout() { tokens.token = null; loggedIn.value = false }
+
+    fun sendComment(changesetId: Long, text: String) {
+        val token = tokens.token ?: run { loggedIn.value = false; return }
+        if (commentState.value is CommentState.Sending) return
+        commentState.value = CommentState.Sending
+        viewModelScope.launch {
+            commentState.value = try {
+                withContext(Dispatchers.IO) { OsmAuth.postComment(authHttp, token, changesetId, text.trim()) }
+                CommentState.Done
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: OsmHttpException) {
+                if (e.code == 401) logout()
+                CommentState.Error(when (e.code) {
+                    401 -> str(R.string.comment_err_auth)
+                    409 -> str(R.string.comment_err_closed)
+                    429 -> str(R.string.comment_err_rate)
+                    else -> e.message ?: "HTTP ${e.code}"
+                })
+            } catch (e: Exception) {
+                CommentState.Error(e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
+    fun resetComment() { commentState.value = CommentState.Idle }
 
     fun markSeen(id: Long, areaId: Long) = viewModelScope.launch { db.changesetDao().markSeen(id, areaId) }
 
@@ -235,6 +338,9 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
 /** areaId fittizio dei changeset aperti da link e non appartenenti a nessuna area. */
 const val EXTERNAL = -1L
 
+private val MIN_CHANGES_STEPS = listOf(0, 10, 100, 500)
+private val MAX_AGE_STEPS = listOf(0, 24, 168) // ore: tutto, 24 h, 7 giorni
+
 sealed interface GeoState {
     data object Loading : GeoState
     data object TooLarge : GeoState
@@ -246,4 +352,11 @@ sealed interface DiffState {
     data class Loading(val ref: ElementRef) : DiffState
     data class Failed(val ref: ElementRef, val message: String) : DiffState
     data class Ready(val diff: ElementDiff) : DiffState
+}
+
+sealed interface CommentState {
+    data object Idle : CommentState
+    data object Sending : CommentState
+    data object Done : CommentState
+    data class Error(val message: String) : CommentState
 }

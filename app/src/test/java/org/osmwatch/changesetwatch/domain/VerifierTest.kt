@@ -83,6 +83,12 @@ class VerifierTest {
         assertEquals(TagChange("name", "A", "B"), d.tags[1])
         assertEquals(null, d.tags[2].new)
         assertEquals(11.1, d.movedMeters!!, 0.5)
+        val m = ElementDiffer.diff(
+            ElementRef(ElementType.RELATION, 3, 2), MODIFY,
+            ElementData(null, emptyList(), emptyMap(), listOf(Member("way", 1, "outer"), Member("way", 2, "inner"))),
+            ElementData(null, emptyList(), emptyMap(), listOf(Member("way", 1, "outer"), Member("way", 9, "inner"))),
+        )
+        assertEquals(1, m.membersAdded); assertEquals(1, m.membersRemoved)
         val w = ElementDiffer.diff(ElementRef(ElementType.WAY, 2, 2), MODIFY, ElementData(null, listOf(1, 2, 3), emptyMap()), ElementData(null, listOf(1, 2, 9), emptyMap()))
         assertEquals(1, w.nodesAdded); assertEquals(1, w.nodesRemoved)
         assertTrue(ElementDiffer.diff(ref, DELETE, null, null).previousMissing)
