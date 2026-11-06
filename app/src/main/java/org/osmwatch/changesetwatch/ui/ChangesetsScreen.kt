@@ -107,7 +107,7 @@ fun ChangesetsScreen(
                             },
                             supportingContent = {
                                 val ago = DateUtils.getRelativeTimeSpanString(r.createdAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)
-                                Text("${r.createdBy ?: "?"} · $ago · ${stringResource(R.string.changes_n, r.changesCount ?: 0)}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("${r.createdBy ?: "?"} · $ago · ${stringResource(R.string.changes_n, r.changesCount ?: 0)}", maxLines = 2, overflow = TextOverflow.Ellipsis)
                             },
                             trailingContent = { Text(r.verdict.name, style = MaterialTheme.typography.labelSmall) },
                         )

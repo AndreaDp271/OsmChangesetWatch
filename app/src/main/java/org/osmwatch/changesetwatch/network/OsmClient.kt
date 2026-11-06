@@ -10,6 +10,9 @@ import okhttp3.Request
 import okhttp3.Response
 import org.osmwatch.changesetwatch.domain.BBox
 import org.osmwatch.changesetwatch.domain.Changeset
+import org.osmwatch.changesetwatch.domain.ElementSource
+import org.osmwatch.changesetwatch.domain.LatLon
+import org.osmwatch.changesetwatch.domain.VersionedId
 import org.osmwatch.changesetwatch.domain.OsmChangeSummary
 
 class OsmHttpException(val code: Int, message: String) : IOException(message)
@@ -43,6 +46,12 @@ class OsmClient(
         execute("$baseUrl/changeset/$changesetId/download".toHttpUrl()) {
             OsmChangeParser.parse(it.body!!.byteStream())
         }
+
+    fun fetchElements(kind: String, ids: List<VersionedId>): Elements {
+        val param = ids.joinToString(",") { if (it.version != null) "${it.id}v${it.version}" else "${it.id}" }
+        val url = "$baseUrl/$kind".toHttpUrl().newBuilder().addQueryParameter(kind, param).build()
+        return execute(url) { MultiFetchParser.parse(it.body!!.byteStream()) }
+    }
 
     private fun <T> execute(url: HttpUrl, parse: (Response) -> T): T {
         val request = Request.Builder().url(url).header("User-Agent", OsmConfig.USER_AGENT).build()
@@ -80,4 +89,23 @@ class OsmClient(
             .readTimeout(OsmConfig.READ_TIMEOUT_S, TimeUnit.SECONDS)
             .build()
     }
+}
+
+/**
+ * Multi fetch (`/nodes?nodes=123v2,456`, `/ways?ways=...`), a blocchi di 100 id, con pausa tra le richieste.
+ * Un 404 (elemento redatto) salta il blocco: il risultato resta parziale invece di fallire.
+ */
+class OsmElementSource(private val client: OsmClient, private val pauseMs: Long = 500) : ElementSource {
+    override fun nodes(ids: List<VersionedId>): Map<Long, LatLon> = chunked(ids, "nodes").flatMap { it.nodes.entries }.associate { it.key to it.value }
+    override fun ways(ids: List<VersionedId>): Map<Long, List<Long>> = chunked(ids, "ways").flatMap { it.ways.entries }.associate { it.key to it.value }
+
+    private fun chunked(ids: List<VersionedId>, kind: String): List<Elements> =
+        ids.chunked(100).mapIndexedNotNull { i, chunk ->
+            if (i > 0) Thread.sleep(pauseMs)
+            try {
+                client.fetchElements(kind, chunk)
+            } catch (e: OsmHttpException) {
+                if (e.code == 404) null else throw e
+            }
+        }
 }

@@ -29,4 +29,10 @@ Obiettivo: app Android OSM Changeset Watch (spec: vedi richiesta iniziale). Lavo
 - Nodi cancellati nel osmChange: coordinate presenti o no? (il parser le accetta null; fixture `osmchange_delete.xml` è scritta a mano)
 
 ## Prossimo passo
-Provare Fase 3 su telefono (refresh, dedup, visto, apertura browser), poi Fase 4.
+Fase 5: filtro anti-falso-positivo (pipeline + test). Soglie da concordare (domanda aperta #3).
+
+## Minimappa (richiesta autore, in deroga al non-obiettivo "nessun visualizzatore diff interno")
+- Nel dettaglio: osmChange + multi-fetch (`nodes?nodes=idvN`, `ways?ways=idvN`, blocchi da 100, pausa 500 ms, max 700 id extra).
+- Verificato sull'API: i nodi cancellati NON hanno coordinate nel osmChange -> si usa la versione v-1. Le way non hanno coordinate -> nodi dal osmChange, gli altri alla posizione corrente.
+- Colori: nuovo verde pieno, modificato arancione, eliminato rosso tratteggiato/cerchio vuoto. Relation non disegnate; >2000 modifiche: non scarica.
+- Test: ChangeGeometryTest (resolver con sorgente finta), live: `OSM_LIVE=1 OSM_CS=<id> gradlew testDebugUnitTest --tests "*LiveGeometryTest*" -i`.

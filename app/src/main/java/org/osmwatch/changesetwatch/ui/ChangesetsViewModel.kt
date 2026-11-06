@@ -3,6 +3,7 @@ package org.osmwatch.changesetwatch.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -15,10 +16,15 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.osmwatch.changesetwatch.data.AppDatabase
 import org.osmwatch.changesetwatch.data.ChangesetRow
 import org.osmwatch.changesetwatch.data.WatchArea
 import org.osmwatch.changesetwatch.data.ChangesetRepository
+import org.osmwatch.changesetwatch.domain.ChangeGeometry
+import org.osmwatch.changesetwatch.domain.GeometryResolver
+import org.osmwatch.changesetwatch.network.OsmClient
+import org.osmwatch.changesetwatch.network.OsmElementSource
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
@@ -40,6 +46,29 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun observeOne(id: Long, areaId: Long): Flow<ChangesetRow?> = db.changesetDao().observeOne(id, areaId)
+
+
+    // --- minimappa del changeset ---
+    private val client = OsmClient()
+    private val geoCache = HashMap<Long, GeoState>()
+    val geoState = MutableStateFlow<GeoState>(GeoState.Loading)
+
+    /** Scarica osmChange + poche richieste (una alla volta) e ricostruisce la geometria. Oltre [MAX_GEO_CHANGES] modifiche: non scarica. */
+    fun loadGeometry(row: ChangesetRow) {
+        geoCache[row.id]?.let { geoState.value = it; return }
+        if ((row.changesCount ?: 0) > MAX_GEO_CHANGES) { geoState.value = GeoState.TooLarge; return }
+        geoState.value = GeoState.Loading
+        viewModelScope.launch {
+            val s = try {
+                val g = withContext(Dispatchers.IO) { GeometryResolver.resolve(client.fetchOsmChange(row.id), OsmElementSource(client)) }
+                GeoState.Ready(g)
+            } catch (e: Exception) {
+                GeoState.Failed(e.message ?: e.javaClass.simpleName)
+            }
+            if (s is GeoState.Ready) geoCache[row.id] = s
+            geoState.value = s
+        }
+    }
 
     fun markSeen(id: Long, areaId: Long) = viewModelScope.launch { db.changesetDao().markSeen(id, areaId) }
 
@@ -70,4 +99,13 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+}
+
+const val MAX_GEO_CHANGES = 2000
+
+sealed interface GeoState {
+    data object Loading : GeoState
+    data object TooLarge : GeoState
+    data class Failed(val message: String) : GeoState
+    data class Ready(val geometry: ChangeGeometry) : GeoState
 }

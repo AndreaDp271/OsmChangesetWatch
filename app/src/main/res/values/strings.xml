@@ -71,4 +71,13 @@
     <string name="data_note">Changesets and map: data © OpenStreetMap contributors (ODbL), read anonymously from the official API.</string>
     <string name="version_fmt">Version %1$s</string>
     <string name="app_tagline">OpenStreetMap changes in your areas · no ads</string>
+    <string name="map_title">Changes on the map</string>
+    <string name="legend_new">New</string>
+    <string name="legend_modified">Modified</string>
+    <string name="legend_deleted">Deleted</string>
+    <string name="geo_loading">Loading the changes…</string>
+    <string name="geo_too_large">Too many changes to download: showing only the changeset area.</string>
+    <string name="geo_failed">Could not load the changes: showing only the changeset area.</string>
+    <string name="geo_empty">No drawable changes (relations only or no coordinates).</string>
+    <string name="geo_partial">Partial view: some elements have no known position (deleted or relations).</string>
 </resources>

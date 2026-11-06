@@ -113,6 +113,7 @@ private fun AppRoot(cvm: ChangesetsViewModel, vm: AreasViewModel = viewModel()) 
         val row by remember(d) { cvm.observeOne(d[0], d[1]) }.collectAsState(null)
         ChangesetDetailScreen(
             row = row, areaName = cvm.areas.value.firstOrNull { it.id == d[1] }?.name,
+            geo = cvm.geoState.collectAsState().value, onLoadGeometry = cvm::loadGeometry,
             onMarkSeen = { cvm.markSeen(d[0], d[1]) }, onBack = { detail = null },
         )
     } else if (id == null) {

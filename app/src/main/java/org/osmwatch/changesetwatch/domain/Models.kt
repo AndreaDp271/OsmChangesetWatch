@@ -26,11 +26,15 @@ data class Changeset(
 
 enum class ChangeAction { CREATE, MODIFY, DELETE }
 
-/** lat/lon null: es. nodi cancellati, che l'API può restituire senza coordinate. */
-data class ChangedNode(val id: Long, val action: ChangeAction, val lat: Double?, val lon: Double?)
+/** lat/lon null: i nodi cancellati nel osmChange non hanno coordinate (verificato sull'API). */
+data class ChangedNode(val id: Long, val action: ChangeAction, val lat: Double?, val lon: Double?, val version: Int? = null)
+
+data class ChangedWay(val id: Long, val action: ChangeAction, val version: Int?, val nodeRefs: List<Long>)
 
 data class OsmChangeSummary(
     val nodes: List<ChangedNode>,
-    val wayCount: Int,
+    val ways: List<ChangedWay>,
     val relationCount: Int,
-)
+) {
+    val wayCount: Int get() = ways.size
+}

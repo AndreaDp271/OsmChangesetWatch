@@ -70,3 +70,16 @@ class OsmClientTest {
         println("LIVE: osmChange nodi=${s.nodes.size} way=${s.wayCount} rel=${s.relationCount}")
     }
 }
+
+class LiveGeometryTest {
+    /** `OSM_LIVE=1 OSM_CS=191555544 gradlew testDebugUnitTest --tests "*LiveGeometryTest*" -i`. Saltato di default. */
+    @Test fun liveGeometry() {
+        assumeTrue(System.getenv("OSM_LIVE") == "1")
+        val id = (System.getenv("OSM_CS") ?: "191555544").toLong()
+        val c = OsmClient()
+        val s = c.fetchOsmChange(id)
+        val g = org.osmwatch.changesetwatch.domain.GeometryResolver.resolve(s, OsmElementSource(c))
+        println("LIVE: nodi=${s.nodes.size} way=${s.ways.size} rel=${s.relationCount} -> punti=${g.points.size} linee=${g.lines.size} parziale=${g.partial}")
+        println("LIVE: azioni punti=${g.points.groupBy { it.action }.mapValues { it.value.size }} linee=${g.lines.groupBy { it.action }.mapValues { it.value.size }}")
+    }
+}
