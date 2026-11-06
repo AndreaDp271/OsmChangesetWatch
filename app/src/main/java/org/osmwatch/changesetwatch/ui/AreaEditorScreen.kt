@@ -238,6 +238,8 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
             factory = {
                 map.apply {
                     setTileSource(TileSourceFactory.MAPNIK)
+                    // osmdroid permetterebbe zoom 29 ingrandendo i tile del 19 (sgranati): fermati dove i tile OSM esistono
+                    maxZoomLevel = TileSourceFactory.MAPNIK.maximumZoomLevel.toDouble()
                     setMultiTouchControls(true)
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     controller.setZoom(13.0)

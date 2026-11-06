@@ -43,6 +43,12 @@ class OsmClientTest {
         assertEquals("100", u.queryParameter("limit"))
     }
 
+    @Test fun userRequest_olderPageUsesTimeRange() {
+        server.enqueue(MockResponse().setBody(empty))
+        client().fetchChangesetsByUser("Anna", 100, Instant.EPOCH, Instant.parse("2026-03-01T00:00:00Z"))
+        assertEquals("1970-01-01T00:00:00Z,2026-03-01T00:00:00Z", server.takeRequest().requestUrl!!.queryParameter("time"))
+    }
+
     @Test fun retries429HonoringRetryAfter_thenSucceeds() {
         server.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "7"))
         server.enqueue(MockResponse().setResponseCode(503))

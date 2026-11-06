@@ -226,4 +226,20 @@
     <string name="boundary_hint">Contano solo le modifiche dentro il confine.</string>
     <string name="use_rectangle">Usa un rettangolo</string>
     <string name="boundary_loading">Carico il confine dettagliato…</string>
+    <string name="load_more">Carica altri</string>
+    <string name="load_more_loading">Carico i changeset precedenti…</string>
+    <string name="load_more_none">Non ci sono changeset più vecchi.</string>
+    <plurals name="load_more_done">
+        <item quantity="one">%1$d changeset più vecchio caricato, %2$d nell\'area</item>
+        <item quantity="other">%1$d changeset più vecchi caricati, %2$d nell\'area</item>
+    </plurals>
+    <string name="history_title">Cronologia</string>
+    <string name="history_failed">Cronologia non disponibile: %1$s</string>
+    <string name="retry">Riprova</string>
+    <string name="history_changeset">Changeset %1$d</string>
+    <string name="history_this_changeset">Questo changeset</string>
+    <plurals name="history_count">
+        <item quantity="one">%1$d versione</item>
+        <item quantity="other">%1$d versioni</item>
+    </plurals>
 </resources>

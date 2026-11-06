@@ -227,4 +227,20 @@
     <string name="boundary_hint">Only changes inside the boundary count.</string>
     <string name="use_rectangle">Use a rectangle</string>
     <string name="boundary_loading">Loading the detailed boundary…</string>
+    <string name="load_more">Load more</string>
+    <string name="load_more_loading">Loading older changesets…</string>
+    <string name="load_more_none">No older changesets.</string>
+    <plurals name="load_more_done">
+        <item quantity="one">%1$d older changeset loaded, %2$d in the area</item>
+        <item quantity="other">%1$d older changesets loaded, %2$d in the area</item>
+    </plurals>
+    <string name="history_title">History</string>
+    <string name="history_failed">Could not load the history: %1$s</string>
+    <string name="retry">Try again</string>
+    <string name="history_changeset">Changeset %1$d</string>
+    <string name="history_this_changeset">This changeset</string>
+    <plurals name="history_count">
+        <item quantity="one">%1$d version</item>
+        <item quantity="other">%1$d versions</item>
+    </plurals>
 </resources>

@@ -22,3 +22,6 @@
 - Area editor: search municipalities and places with Nominatim; an area can follow the real boundary, and verification uses it.
 - Redesigned list, detail, areas and area editor; footprint glyph showing where a changeset falls in the area.
 - Database migrations keep existing areas (versions 2 to 5).
+- "Load more" at the end of the list fetches older changesets; the verification budget now counts only real downloads.
+- Element history inside the app, with the differences between versions and links to each changeset.
+- Maps stop at zoom 19, where OSM tiles exist, instead of showing blurry enlarged tiles.

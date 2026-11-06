@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
@@ -128,7 +129,7 @@ fun ChangesetsScreen(vm: ChangesetsViewModel, onOpen: (ChangesetRow) -> Unit, on
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { AreaPicker(areas, areaFilter, rows.size, areasOnly) { vm.areaFilter.value = it } },
+                title = { AreaPicker(areas, areaFilter, rows.size, areasOnly) { vm.areaFilter.value = it; vm.loadMoreResult.value = null } },
                 actions = {
                     IconButton(onClick = vm::refresh) { Icon(Icons.Default.Refresh, stringResource(R.string.refresh)) }
                     IconButton(onClick = onAreas) { Icon(Icons.Default.Place, stringResource(R.string.areas)) }
@@ -168,6 +169,7 @@ fun ChangesetsScreen(vm: ChangesetsViewModel, onOpen: (ChangesetRow) -> Unit, on
                     items(rows, key = { "${it.id}-${it.areaId}" }) { r ->
                         ChangesetCard(r, byId[r.areaId], Flags.header(r.changesCount, r.comment, r.user, suspects) + Flags.fromCounts(r.createdCount, r.modifiedCount, r.deletedCount)) { onOpen(r) }
                     }
+                    if (areasOnly && areas.isNotEmpty()) item(key = "load-more") { LoadMore(vm) }
                 }
             }
         }
@@ -315,6 +317,31 @@ private fun ChangesetCard(r: ChangesetRow, area: WatchArea?, flags: List<Flag>, 
 @Composable
 fun Pills(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { content() }
+}
+
+/** In fondo alla lista: scarica i changeset precedenti al più vecchio già salvato e dice cosa ha trovato. */
+@Composable
+private fun LoadMore(vm: ChangesetsViewModel) {
+    val loading by vm.loadingMore.collectAsState()
+    val result by vm.loadMoreResult.collectAsState()
+    val refreshing by vm.refreshing.collectAsState()
+    Column(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        androidx.compose.material3.OutlinedButton(
+            onClick = vm::loadMore, enabled = !loading && !refreshing,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (loading) {
+                androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.size(10.dp))
+                Text(stringResource(R.string.load_more_loading))
+            } else {
+                Icon(Icons.Default.History, null, Modifier.size(18.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(R.string.load_more))
+            }
+        }
+        result?.let { Muted(it, Modifier.padding(top = 8.dp)) }
+    }
 }
 
 @Composable

@@ -71,6 +71,8 @@ fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, onElementTap: (ElementRe
     val map = remember {
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
+            // osmdroid permetterebbe zoom 29 ingrandendo i tile del 19 (sgranati): fermati dove i tile OSM esistono
+            maxZoomLevel = TileSourceFactory.MAPNIK.maximumZoomLevel.toDouble()
             setMultiTouchControls(true)
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             // dentro una colonna scrollabile: il gesto sulla mappa non deve scorrere la pagina

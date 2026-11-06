@@ -133,7 +133,15 @@ fun ChangesetDetailScreen(vm: ChangesetsViewModel, id: Long, areaId: Long, area:
             Toast.makeText(ctx, R.string.comment_sent, Toast.LENGTH_SHORT).show()
         }
     }
-    diff?.let { DiffDialog(it, vm::clearDiff) }
+    val history by vm.historyState.collectAsState()
+    diff?.let { DiffDialog(it, vm::clearDiff, onHistory = vm::loadHistory) }
+    history?.let { h ->
+        HistoryDialog(
+            h, onClose = vm::clearHistory,
+            onOpenChangeset = { cs -> vm.clearHistory(); vm.clearDiff(); if (cs != id) vm.openLink(cs) },
+            onRetry = { vm.loadHistory(h.ref) },
+        )
+    }
     if (showComment && loggedIn) CommentDialog(commentState, { vm.sendComment(id, it) }, vm::logout) { showComment = false; vm.resetComment() }
 
     Scaffold(
@@ -464,7 +472,7 @@ private fun Legend(color: Int, label: Int) {
 }
 
 @Composable
-private fun DiffDialog(state: DiffState, onDismiss: () -> Unit) {
+private fun DiffDialog(state: DiffState, onDismiss: () -> Unit, onHistory: (ElementRef) -> Unit) {
     val ref = when (state) { is DiffState.Loading -> state.ref; is DiffState.Failed -> state.ref; is DiffState.Ready -> state.diff.ref }
     val ctx = LocalContext.current
     AlertDialog(
@@ -472,7 +480,7 @@ private fun DiffDialog(state: DiffState, onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
         dismissButton = {
             Row {
-                TextButton(onClick = { openUrl(ctx, Links.elementHistory(ref.type, ref.id)) }) { Text(stringResource(R.string.el_history)) }
+                TextButton(onClick = { onHistory(ref) }) { Text(stringResource(R.string.el_history)) }
                 TextButton(onClick = { openUrl(ctx, Links.editInId(ref.type, ref.id)) }) { Text(stringResource(R.string.el_edit_id)) }
             }
         },
@@ -530,6 +538,81 @@ private fun ElementsList(all: List<ChangedElement>, onTap: (ElementRef) -> Unit)
         }
     }
     if (shown.size > limit) TextButton(onClick = { limit += 100 }) { Text(stringResource(R.string.show_more, shown.size - limit)) }
+}
+
+/** Cronologia a schermo intero: una scheda per versione, dalla più recente, con le differenze rispetto alla precedente. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryDialog(state: HistoryState, onClose: () -> Unit, onOpenChangeset: (Long) -> Unit, onRetry: () -> Unit) {
+    val ctx = LocalContext.current
+    val ref = state.ref
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(stringResource(R.string.history_title), fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${stringResource(kindLabel(ref.type))} ${ref.id}", style = MaterialTheme.typography.bodySmall.tabular(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) } },
+                    actions = {
+                        TextButton(onClick = { openUrl(ctx, Links.elementHistory(ref.type, ref.id)) }) { Text("osm.org") }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                )
+                when (state) {
+                    is HistoryState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator() }
+                    is HistoryState.Failed -> Column(Modifier.padding(16.dp)) {
+                        Text(stringResource(R.string.history_failed, state.message), color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                    }
+                    is HistoryState.Ready -> androidx.compose.foundation.lazy.LazyColumn(
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        item { Muted(androidx.compose.ui.res.pluralStringResource(R.plurals.history_count, state.versions.size, state.versions.size)) }
+                        items(state.versions.size) { i ->
+                            val (v, d) = state.versions[i]
+                            VersionCard(v, d, current = ref.version == v.version, onOpenChangeset = onOpenChangeset)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun VersionCard(v: org.osmwatch.changesetwatch.domain.ElementVersion, d: ElementDiff, current: Boolean, onOpenChangeset: (Long) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp), tonalElevation = 1.dp,
+        color = if (current) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("v${v.version}", style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.SemiBold)
+                Text(
+                    v.user ?: "?", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = 10.dp),
+                )
+                v.timestamp?.let { Text(fmt(it.toEpochMilli()), style = MaterialTheme.typography.bodySmall.tabular(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            if (current) Pill(stringResource(R.string.history_this_changeset), MaterialTheme.colorScheme.primary, Modifier.padding(top = 6.dp))
+            v.changeset?.let { cs ->
+                TextButton(onClick = { onOpenChangeset(cs) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp)) {
+                    Text(stringResource(R.string.history_changeset, cs), style = MaterialTheme.typography.labelLarge.tabular())
+                }
+            }
+            DiffBody(d)
+        }
+    }
 }
 
 @Composable

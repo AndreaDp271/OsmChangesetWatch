@@ -233,6 +233,25 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // --- cronologia completa di un elemento ---
+    val historyState = MutableStateFlow<HistoryState?>(null)
+
+    fun loadHistory(ref: ElementRef) {
+        historyState.value = HistoryState.Loading(ref)
+        viewModelScope.launch {
+            historyState.value = try {
+                val versions = withContext(Dispatchers.IO) { client.fetchHistory(ref.type, ref.id) }
+                HistoryState.Ready(ref, org.osmwatch.changesetwatch.domain.ElementHistory.diffs(ref, versions))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                HistoryState.Failed(ref, e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
+    fun clearHistory() { historyState.value = null }
+
     // --- cosa è cambiato in un elemento toccato sulla mappa ---
     val diffState = MutableStateFlow<DiffState?>(null)
 
@@ -417,6 +436,45 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
      * Scarica gli ultimi 100 changeset per ogni area abilitata, anche precedenti alla creazione dell'area, e li verifica
      * (dentro l'area davvero?). Aree una alla volta con pausa di 1 s (rate limit). I duplicati sono ignorati dal DB.
      */
+    val loadingMore = MutableStateFlow(false)
+    /** Esito dell'ultimo "Carica altri" (testo già pronto), null finché non lo premi. */
+    val loadMoreResult = MutableStateFlow<String?>(null)
+
+    /** Pagina più vecchia per l'area scelta, o per tutte le aree abilitate; una alla volta, 1 s di pausa. */
+    fun loadMore() {
+        if (loadingMore.value || refreshing.value) return
+        viewModelScope.launch {
+            loadingMore.value = true
+            loadMoreResult.value = null
+            error.value = null
+            var fetched = 0
+            var confirmed = 0
+            val failures = mutableListOf<String>()
+            try {
+                val all = db.areaDao().observeAll().first()
+                val targets = areaFilter.value?.let { id -> all.filter { it.id == id } } ?: all.filter { it.enabled }
+                targets.forEachIndexed { i, area ->
+                    if (i > 0) delay(1_000)
+                    try {
+                        val r = repo.loadOlder(area) { done, total -> progress.value = if (total > 0) "${area.name}: $done/$total" else null }
+                        fetched += r.fetched; confirmed += r.confirmed
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        failures += "${area.name}: ${e.message ?: e.javaClass.simpleName}"
+                    }
+                }
+                val res = getApplication<Application>().resources
+                loadMoreResult.value = if (fetched == 0) res.getString(R.string.load_more_none)
+                else res.getQuantityString(R.plurals.load_more_done, fetched, fetched, confirmed)
+            } finally {
+                progress.value = null
+                error.update { failures.takeIf { it.isNotEmpty() }?.joinToString("\n") }
+                loadingMore.value = false
+            }
+        }
+    }
+
     fun refresh() {
         if (refreshing.value) return
         viewModelScope.launch {
@@ -468,4 +526,14 @@ sealed interface CommentState {
     data object Sending : CommentState
     data object Done : CommentState
     data class Error(val message: String) : CommentState
+}
+
+sealed interface HistoryState {
+    val ref: ElementRef
+    data class Loading(override val ref: ElementRef) : HistoryState
+    data class Failed(override val ref: ElementRef, val message: String) : HistoryState
+    data class Ready(
+        override val ref: ElementRef,
+        val versions: List<Pair<org.osmwatch.changesetwatch.domain.ElementVersion, org.osmwatch.changesetwatch.domain.ElementDiff>>,
+    ) : HistoryState
 }

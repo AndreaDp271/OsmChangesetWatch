@@ -62,11 +62,13 @@ class OsmClient(
             if (e.code == 404 || e.code == 410) null else throw e
         }
 
-    /** [closedAfter]: solo chiusi dopo T1 o ancora aperti (`time=T1`). */
-    fun fetchChangesetsByUser(displayName: String, limit: Int = 50, closedAfter: Instant? = null): List<Changeset> =
+    /** [closedAfter]: solo chiusi dopo T1 o ancora aperti (`time=T1`); con [createdBefore] anche creati prima di T2 (`time=T1,T2`). */
+    fun fetchChangesetsByUser(displayName: String, limit: Int = 50, closedAfter: Instant? = null, createdBefore: Instant? = null): List<Changeset> =
         execute("$baseUrl/changesets".toHttpUrl().newBuilder()
             .addQueryParameter("display_name", displayName).addQueryParameter("limit", limit.toString())
-            .apply { if (closedAfter != null) addQueryParameter("time", closedAfter.toString()) }.build()) {
+            .apply {
+                if (closedAfter != null) addQueryParameter("time", if (createdBefore != null) "$closedAfter,$createdBefore" else closedAfter.toString())
+            }.build()) {
             ChangesetParser.parse(it.body!!.byteStream())
         }
 
@@ -76,6 +78,10 @@ class OsmClient(
             .addQueryParameter("user", uid.toString()).addQueryParameter("limit", limit.toString()).build()) {
             ChangesetParser.parse(it.body!!.byteStream())
         }
+
+    /** Tutte le versioni di un elemento (anche quelle cancellate). */
+    fun fetchHistory(type: ElementType, id: Long): List<org.osmwatch.changesetwatch.domain.ElementVersion> =
+        execute("$baseUrl/${type.name.lowercase()}/$id/history".toHttpUrl()) { HistoryParser.parse(it.body!!.byteStream()) }
 
     fun fetchOsmChange(changesetId: Long): OsmChangeSummary =
         execute("$baseUrl/changeset/$changesetId/download".toHttpUrl()) {

@@ -97,6 +97,9 @@ interface ChangesetDao {
     @Query("SELECT * FROM changeset WHERE (:areaId IS NULL OR areaId = :areaId) AND (:includeSeen OR seen = 0) AND verdict IN (:verdicts) ORDER BY createdAt DESC")
     fun observe(areaId: Long?, includeSeen: Boolean, verdicts: List<String>): Flow<List<ChangesetRow>>
 
+    @Query("SELECT MIN(createdAt) FROM changeset WHERE areaId = :areaId")
+    suspend fun oldestCreatedAt(areaId: Long): Long?
+
     @Query("SELECT * FROM changeset WHERE areaId = :areaId AND verdict = 'PENDING' ORDER BY createdAt DESC LIMIT :limit")
     suspend fun pending(areaId: Long, limit: Int): List<ChangesetRow>
 
