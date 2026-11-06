@@ -17,6 +17,7 @@ import org.osmwatch.changesetwatch.domain.ElementType
 import org.osmwatch.changesetwatch.domain.ElementVersion
 import org.osmwatch.changesetwatch.domain.LatLon
 import org.osmwatch.changesetwatch.domain.OsmChangeSummary
+import org.osmwatch.changesetwatch.domain.UserBlock
 import org.osmwatch.changesetwatch.domain.UserInfo
 import org.osmwatch.changesetwatch.domain.VersionedId
 
@@ -26,6 +27,7 @@ class OsmHttpException(val code: Int, message: String) : IOException(message)
 class OsmClient(
     private val http: OkHttpClient = defaultHttp(),
     private val baseUrl: String = OsmConfig.BASE_URL,
+    private val webUrl: String = OsmConfig.WEB_URL,
     private val sleep: (Long) -> Unit = { Thread.sleep(it) },
 ) {
 
@@ -127,6 +129,28 @@ class OsmClient(
         ) {
             ChangesetParser.parse(it.body!!.byteStream())
         }
+
+    /**
+     * Blocchi ricevuti dall'utente, dal più recente, al massimo [limit]. Gli id arrivano dalla
+     * pagina web (l'API non li elenca), i dettagli dall'API, una richiesta alla volta.
+     */
+    fun fetchBlocks(displayName: String, limit: Int = 10): List<UserBlock> {
+        val page =
+            webUrl
+                .toHttpUrl()
+                .newBuilder()
+                .addPathSegments("user")
+                .addPathSegment(displayName)
+                .addPathSegment("blocks")
+                .build()
+        val ids = execute(page) { BlockParser.idsFromPage(it.body!!.string()) }.take(limit)
+        return ids.mapIndexedNotNull { i, id ->
+            if (i > 0) sleep(500)
+            execute("$baseUrl/user_blocks/$id".toHttpUrl()) {
+                BlockParser.parse(it.body!!.byteStream())
+            }
+        }
+    }
 
     /** Tutte le versioni di un elemento (anche quelle cancellate). */
     fun fetchHistory(type: ElementType, id: Long): List<ElementVersion> =

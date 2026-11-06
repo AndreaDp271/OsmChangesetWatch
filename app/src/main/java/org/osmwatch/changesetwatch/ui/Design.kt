@@ -4,6 +4,7 @@ import android.icu.text.RelativeDateTimeFormatter
 import android.icu.util.ULocale
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,8 +36,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.text.DateFormat
@@ -202,14 +205,25 @@ fun Pill(text: String, color: Color, modifier: Modifier = Modifier) {
     )
 }
 
-/** Numero grande con didascalia (profilo autore). */
+/** Numero grande con didascalia (profilo autore); con [onClick] il numero è un link. */
 @Composable
-fun Stat(value: String, label: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
+fun Stat(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    Column(
+        if (onClick == null) modifier
+        else
+            modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClick = onClick)
+    ) {
         Text(
             value,
             style = MaterialTheme.typography.titleLarge.tabular(),
             fontWeight = FontWeight.SemiBold,
+            color = if (onClick == null) Color.Unspecified else MaterialTheme.colorScheme.primary,
+            textDecoration = if (onClick == null) null else TextDecoration.Underline,
         )
         Text(
             label,

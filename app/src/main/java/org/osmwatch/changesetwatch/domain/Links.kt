@@ -1,5 +1,7 @@
 package org.osmwatch.changesetwatch.domain
 
+import java.net.URI
+
 /**
  * Template dei visualizzatori esterni; `{id}` = id changeset. Configurabili qui in un unico punto.
  */
@@ -16,6 +18,10 @@ object Links {
 
     fun editInId(t: ElementType, id: Long) =
         "https://www.openstreetmap.org/edit?editor=id&${path(t)}=$id"
+
+    /** Pagina dei blocchi ricevuti; il nome può avere spazi e lettere accentate. */
+    fun userBlocks(user: String): String =
+        URI("https", "www.openstreetmap.org", "/user/$user/blocks", null).toASCIIString()
 
     fun url(template: String, changesetId: Long) = template.replace("{id}", changesetId.toString())
 

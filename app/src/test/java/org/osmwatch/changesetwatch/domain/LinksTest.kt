@@ -14,6 +14,18 @@ class LinksTest {
     }
 
     @Test
+    fun userBlocksEncodesName() {
+        assertEquals(
+            "https://www.openstreetmap.org/user/Nix%20Nada/blocks",
+            Links.userBlocks("Nix Nada"),
+        )
+        assertEquals(
+            "https://www.openstreetmap.org/user/Citt%C3%A0/blocks",
+            Links.userBlocks("Città"),
+        )
+    }
+
+    @Test
     fun templatesFillId() {
         assertEquals("https://www.openstreetmap.org/changeset/42", Links.url(Links.OSM, 42))
         assertEquals("https://overpass-api.de/achavi/?changeset=42", Links.url(Links.ACHAVI, 42))

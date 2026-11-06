@@ -262,4 +262,20 @@
     <string name="update_not_newer">La versione scaricata non è più recente di quella installata</string>
     <string name="update_no_space">Spazio di archiviazione insufficiente</string>
     <string name="update_install_failed">Installazione non riuscita</string>
+    <string name="blocks_title">Blocchi ricevuti</string>
+    <string name="blocks_failed">Blocchi non disponibili: %1$s</string>
+    <string name="blocks_none">Nessun blocco trovato nella pagina dell\'utente.</string>
+    <string name="blocks_more">Mostrati i %1$d più recenti: gli altri su osm.org.</string>
+    <string name="block_period">%1$s → %2$s</string>
+    <string name="block_by">Bloccato da %1$s</string>
+    <string name="block_active">In corso</string>
+    <string name="block_warning">Solo avviso</string>
+    <string name="users">Utenti</string>
+    <string name="users_watched">Seguiti</string>
+    <string name="users_watched_empty">Ancora nessuno: apri un changeset e tocca «Segui utente», oppure aggiungilo da Aree.</string>
+    <string name="users_suspect">Sospetti</string>
+    <string name="users_suspect_empty">Ancora nessuno: segna come sospetto l\'autore di un changeset.</string>
+    <string name="users_trusted">Fidati</string>
+    <string name="users_trusted_empty">Ancora nessuno: segna come fidato l\'autore di un changeset.</string>
+    <string name="remove_from_list">Togli %1$s</string>
 </resources>

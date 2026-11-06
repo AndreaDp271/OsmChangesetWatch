@@ -263,4 +263,20 @@
     <string name="update_not_newer">The downloaded version is not newer than the installed one</string>
     <string name="update_no_space">Not enough storage space</string>
     <string name="update_install_failed">Installation failed</string>
+    <string name="blocks_title">Blocks received</string>
+    <string name="blocks_failed">Could not load the blocks: %1$s</string>
+    <string name="blocks_none">No blocks found on the user page.</string>
+    <string name="blocks_more">Showing the %1$d most recent: the others are on osm.org.</string>
+    <string name="block_period">%1$s → %2$s</string>
+    <string name="block_by">Blocked by %1$s</string>
+    <string name="block_active">Active</string>
+    <string name="block_warning">Warning only</string>
+    <string name="users">Users</string>
+    <string name="users_watched">Watched</string>
+    <string name="users_watched_empty">Nobody yet: open a changeset and tap "Watch user", or add one from Areas.</string>
+    <string name="users_suspect">Suspect</string>
+    <string name="users_suspect_empty">Nobody yet: mark an author as suspect from a changeset.</string>
+    <string name="users_trusted">Trusted</string>
+    <string name="users_trusted_empty">Nobody yet: mark an author as trusted from a changeset.</string>
+    <string name="remove_from_list">Remove %1$s</string>
 </resources>

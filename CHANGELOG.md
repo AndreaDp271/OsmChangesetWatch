@@ -29,3 +29,7 @@
 - New icon: a way with a moved node and its previous position; the notification icon matches it.
 - Updates from GitHub releases inside the app: daily check at startup (can be turned off), download with progress, install only if signed like the installed app.
 - Code formatted with ktfmt through Spotless; repeated error handling merged into one helper.
+- Tap the number of blocks in the author card to read each block: dates, who blocked, full reason.
+- Users screen (icon in the list bar): watched, suspect and trusted users; tap a name for their changesets, remove with the cross.
+- Suspect and trusted exclude each other; the chips are grey when off and coloured when on.
+- The list keeps its scroll position when you come back from a changeset.

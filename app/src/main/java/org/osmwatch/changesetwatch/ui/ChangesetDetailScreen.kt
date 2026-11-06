@@ -23,9 +23,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -54,6 +56,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -89,6 +92,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import java.time.Instant
 import kotlin.math.roundToInt
 import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.ChangesetRow
@@ -100,10 +104,12 @@ import org.osmwatch.changesetwatch.domain.ChangesetComment
 import org.osmwatch.changesetwatch.domain.ElementDiff
 import org.osmwatch.changesetwatch.domain.ElementRef
 import org.osmwatch.changesetwatch.domain.ElementType
+import org.osmwatch.changesetwatch.domain.ElementVersion
 import org.osmwatch.changesetwatch.domain.Flags
 import org.osmwatch.changesetwatch.domain.Links
 import org.osmwatch.changesetwatch.domain.RowTags
 import org.osmwatch.changesetwatch.domain.UserActivity
+import org.osmwatch.changesetwatch.domain.UserBlock
 import org.osmwatch.changesetwatch.domain.UserInfo
 import org.osmwatch.changesetwatch.domain.Verdict
 
@@ -163,6 +169,14 @@ fun ChangesetDetailScreen(
                 if (cs != id) vm.openLink(cs)
             },
             onRetry = { vm.loadHistory(h.ref) },
+        )
+    }
+    vm.blocksState.collectAsState().value?.let { b ->
+        BlocksDialog(
+            b,
+            total = userInfo?.blocksReceived,
+            onClose = vm::clearBlocks,
+            onRetry = { vm.loadBlocks(b.user) },
         )
     }
     if (showComment && loggedIn)
@@ -269,6 +283,7 @@ fun ChangesetDetailScreen(
                         onSuspect = { vm.toggleSuspect(u) },
                         onTrusted = { vm.toggleTrusted(u) },
                         onHdyc = { openUrl(ctx, "https://hdyc.neis-one.org/?" + Uri.encode(u)) },
+                        onBlocks = { vm.loadBlocks(u) },
                         profileOpen = profileOpen,
                         onToggleProfile = { profileOpen = !profileOpen },
                         activity = activity,
@@ -436,6 +451,7 @@ private fun AuthorCard(
     onSuspect: () -> Unit,
     onTrusted: () -> Unit,
     onHdyc: () -> Unit,
+    onBlocks: () -> Unit,
     profileOpen: Boolean,
     onToggleProfile: () -> Unit,
     activity: UserActivity?,
@@ -495,10 +511,12 @@ private fun AuthorCard(
                         stringResource(R.string.stat_since),
                         Modifier.weight(1f),
                     )
+                    val blocks = info.blocksReceived ?: 0
                     Stat(
-                        "${info.blocksReceived ?: 0}",
+                        "$blocks",
                         stringResource(R.string.stat_blocks),
                         Modifier.weight(1f),
+                        onClick = onBlocks.takeIf { blocks > 0 },
                     )
                 }
             }
@@ -511,17 +529,30 @@ private fun AuthorCard(
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.watch_user_btn))
                 }
+                // spento = grigio, acceso = pieno nel colore del significato: prima l'icona
+                // colorata
+                // del chip spento sembrava già attiva
                 FilterChip(
                     selected = suspect,
                     onClick = onSuspect,
                     label = { Text(stringResource(R.string.chip_suspect)) },
                     leadingIcon = { Icon(Icons.Default.Flag, null, Modifier.size(18.dp)) },
+                    colors =
+                        markChipColors(
+                            MaterialTheme.colorScheme.errorContainer,
+                            MaterialTheme.colorScheme.onErrorContainer,
+                        ),
                 )
                 FilterChip(
                     selected = trusted,
                     onClick = onTrusted,
                     label = { Text(stringResource(R.string.chip_trusted)) },
                     leadingIcon = { Icon(Icons.Default.Verified, null, Modifier.size(18.dp)) },
+                    colors =
+                        markChipColors(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
                 )
             }
             if (uid != null) {
@@ -980,6 +1011,144 @@ private fun ElementsList(all: List<ChangedElement>, onTap: (ElementRef) -> Unit)
         }
 }
 
+@Composable
+private fun markChipColors(container: Color, content: Color) =
+    FilterChipDefaults.filterChipColors(
+        iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        selectedContainerColor = container,
+        selectedLabelColor = content,
+        selectedLeadingIconColor = content,
+    )
+
+/** Blocchi ricevuti dall'autore a schermo intero: periodo, chi ha bloccato e motivo completo. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BlocksDialog(
+    state: BlocksState,
+    total: Int?,
+    onClose: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    val ctx = LocalContext.current
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                stringResource(R.string.blocks_title),
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                state.user,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
+                        }
+                    },
+                    actions = {
+                        TextButton(onClick = { openUrl(ctx, Links.userBlocks(state.user)) }) {
+                            Text("osm.org")
+                        }
+                    },
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        ),
+                )
+                when (state) {
+                    is BlocksState.Loading ->
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    is BlocksState.Failed ->
+                        Column(Modifier.padding(16.dp)) {
+                            Text(
+                                stringResource(R.string.blocks_failed, state.message),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                        }
+                    is BlocksState.Ready ->
+                        LazyColumn(
+                            contentPadding =
+                                PaddingValues(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = 4.dp,
+                                    bottom = 24.dp,
+                                ),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            if (state.blocks.isEmpty())
+                                item { Muted(stringResource(R.string.blocks_none)) }
+                            else if (total != null && total > state.blocks.size)
+                                item {
+                                    Muted(stringResource(R.string.blocks_more, state.blocks.size))
+                                }
+                            items(state.blocks, key = { it.id }) { BlockCard(it) }
+                        }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BlockCard(b: UserBlock) {
+    val start = b.createdAt
+    val end = b.endsAt
+    // un blocco che finisce quando inizia serve solo a far leggere un messaggio
+    val warningOnly = start != null && end != null && !end.isAfter(start)
+    val active = end != null && end.isAfter(Instant.now())
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    when {
+                        start == null -> "?"
+                        warningOnly || end == null -> fmt(start.toEpochMilli())
+                        else ->
+                            stringResource(
+                                R.string.block_period,
+                                fmt(start.toEpochMilli()),
+                                fmt(end.toEpochMilli()),
+                            )
+                    },
+                    style = MaterialTheme.typography.titleSmall.tabular(),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                when {
+                    active ->
+                        Pill(stringResource(R.string.block_active), MaterialTheme.colorScheme.error)
+                    warningOnly ->
+                        Pill(
+                            stringResource(R.string.block_warning),
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                }
+            }
+            b.creator?.let { Muted(stringResource(R.string.block_by, it)) }
+            SelectionContainer { Text(b.reason, style = MaterialTheme.typography.bodyMedium) }
+        }
+    }
+}
+
 /**
  * Cronologia a schermo intero: una scheda per versione, dalla più recente, con le differenze
  * rispetto alla precedente.
@@ -1083,7 +1252,7 @@ private fun HistoryDialog(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VersionCard(
-    v: org.osmwatch.changesetwatch.domain.ElementVersion,
+    v: ElementVersion,
     d: ElementDiff,
     current: Boolean,
     onOpenChangeset: (Long) -> Unit,

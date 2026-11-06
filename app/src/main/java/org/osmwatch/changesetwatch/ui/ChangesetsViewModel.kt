@@ -48,6 +48,7 @@ import org.osmwatch.changesetwatch.domain.OsmChangeSummary
 import org.osmwatch.changesetwatch.domain.RowTags
 import org.osmwatch.changesetwatch.domain.UserActivity
 import org.osmwatch.changesetwatch.domain.UserActivityCalc
+import org.osmwatch.changesetwatch.domain.UserBlock
 import org.osmwatch.changesetwatch.domain.UserInfo
 import org.osmwatch.changesetwatch.domain.Verdict
 import org.osmwatch.changesetwatch.domain.VersionedId
@@ -200,14 +201,31 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Sospetto e fidato si escludono: segnarne uno toglie l'altro. */
     fun toggleSuspect(user: String) {
-        suspectUsers.update { if (user in it) it - user else it + user }
-        prefs.suspectUsers = suspectUsers.value
+        val add = user !in suspectUsers.value
+        suspectUsers.update { if (add) it + user else it - user }
+        if (add) trustedUsers.update { it - user }
+        saveUserLists()
     }
 
     fun toggleTrusted(user: String) {
-        trustedUsers.update { if (user in it) it - user else it + user }
+        val add = user !in trustedUsers.value
+        trustedUsers.update { if (add) it + user else it - user }
+        if (add) suspectUsers.update { it - user }
+        saveUserLists()
+    }
+
+    private fun saveUserLists() {
+        prefs.suspectUsers = suspectUsers.value
         prefs.trustedUsers = trustedUsers.value
+    }
+
+    /** Dalla schermata utenti: i changeset recenti di [user], ovunque nel mondo. */
+    fun showUserChangesets(user: String) {
+        areasOnly.value = false
+        query.value = user
+        searchGlobal()
     }
 
     /**
@@ -348,6 +366,30 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearHistory() {
         historyState.value = null
+    }
+
+    // --- blocchi ricevuti dall'autore, con data e motivo ---
+    val blocksState = MutableStateFlow<BlocksState?>(null)
+
+    fun loadBlocks(user: String) {
+        val loading = BlocksState.Loading(user)
+        blocksState.value = loading
+        viewModelScope.launch {
+            val result =
+                attempt {
+                        BlocksState.Ready(
+                            user,
+                            withContext(Dispatchers.IO) { client.fetchBlocks(user) },
+                        )
+                    }
+                    .getOrElse { BlocksState.Failed(user, it.reason) }
+            // chiuso o riaperto per un altro utente nel frattempo: il risultato non serve più
+            if (blocksState.value === loading) blocksState.value = result
+        }
+    }
+
+    fun clearBlocks() {
+        blocksState.value = null
     }
 
     // --- cosa è cambiato in un elemento toccato sulla mappa ---
@@ -689,6 +731,16 @@ sealed interface CommentState {
     data object Done : CommentState
 
     data class Error(val message: String) : CommentState
+}
+
+sealed interface BlocksState {
+    val user: String
+
+    data class Loading(override val user: String) : BlocksState
+
+    data class Failed(override val user: String, val message: String) : BlocksState
+
+    data class Ready(override val user: String, val blocks: List<UserBlock>) : BlocksState
 }
 
 sealed interface HistoryState {

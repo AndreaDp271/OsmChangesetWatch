@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,6 +40,7 @@ import org.osmwatch.changesetwatch.ui.ChangesetsScreen
 import org.osmwatch.changesetwatch.ui.ChangesetsViewModel
 import org.osmwatch.changesetwatch.ui.OsmWatchTheme
 import org.osmwatch.changesetwatch.ui.SettingsScreen
+import org.osmwatch.changesetwatch.ui.UsersScreen
 import org.osmwatch.changesetwatch.work.PollWorker
 
 class MainActivity : ComponentActivity() {
@@ -124,12 +126,14 @@ private fun AppRoot(cvm: ChangesetsViewModel, vm: AreasViewModel = viewModel()) 
     val areas by vm.areas.collectAsState()
     var showAreas by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showUsers by rememberSaveable { mutableStateOf(false) }
     // null = lista, 0 = nuova, >0 = id area
     var editing by rememberSaveable { mutableStateOf<Long?>(null) }
     var detail by rememberSaveable { mutableStateOf<List<Long>?>(null) } // [id changeset, id area]
     val id = editing
     val d = detail
     val ctx = LocalContext.current
+    val listState = rememberLazyListState()
     val login = {
         try {
             ctx.startActivity(cvm.loginIntent())
@@ -141,6 +145,7 @@ private fun AppRoot(cvm: ChangesetsViewModel, vm: AreasViewModel = viewModel()) 
     LaunchedEffect(req) {
         req?.let {
             showSettings = false
+            showUsers = false
             showAreas = false
             editing = null
             detail = it
@@ -154,12 +159,28 @@ private fun AppRoot(cvm: ChangesetsViewModel, vm: AreasViewModel = viewModel()) 
             onLogout = cvm::logout,
             onBack = { showSettings = false },
         )
+    } else if (showUsers) {
+        UsersScreen(
+            watched = areas.orEmpty().filter { it.watchUser != null },
+            suspects = cvm.suspectUsers.collectAsState().value,
+            trusted = cvm.trustedUsers.collectAsState().value,
+            onOpen = {
+                cvm.showUserChangesets(it)
+                showUsers = false
+            },
+            onUnwatch = { vm.delete(it.id) },
+            onUnsuspect = cvm::toggleSuspect,
+            onUntrust = cvm::toggleTrusted,
+            onBack = { showUsers = false },
+        )
     } else if (id == null && !showAreas && d == null) {
         ChangesetsScreen(
             cvm,
             onOpen = { detail = listOf(it.id, it.areaId) },
             onAreas = { showAreas = true },
+            onUsers = { showUsers = true },
             onSettings = { showSettings = true },
+            listState = listState,
         )
     } else if (d != null) {
         ChangesetDetailScreen(

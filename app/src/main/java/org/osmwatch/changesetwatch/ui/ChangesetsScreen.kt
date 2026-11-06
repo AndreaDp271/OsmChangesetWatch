@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -30,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
@@ -118,7 +121,11 @@ fun ChangesetsScreen(
     vm: ChangesetsViewModel,
     onOpen: (ChangesetRow) -> Unit,
     onAreas: () -> Unit,
+    onUsers: () -> Unit,
     onSettings: () -> Unit,
+    // dal chiamante: la schermata esce dalla composizione quando si apre un changeset e la
+    // posizione nella lista andrebbe persa
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val areasOnly by vm.areasOnly.collectAsState()
     val local by vm.changesets.collectAsState()
@@ -150,6 +157,9 @@ fun ChangesetsScreen(
                     }
                     IconButton(onClick = onAreas) {
                         Icon(Icons.Default.Place, stringResource(R.string.areas))
+                    }
+                    IconButton(onClick = onUsers) {
+                        Icon(Icons.Default.Group, stringResource(R.string.users))
                     }
                     val update = Updater.state.collectAsState().value is Updater.State.Available
                     IconButton(onClick = onSettings) {
@@ -227,6 +237,7 @@ fun ChangesetsScreen(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 LazyColumn(
+                    state = listState,
                     contentPadding =
                         PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),

@@ -119,3 +119,15 @@ data class UserInfo(
     val roles: List<String> = emptyList(),
     val traces: Int? = null,
 )
+
+/**
+ * Blocco ricevuto da un utente (`GET /user_blocks/ID`). Se [endsAt] coincide con [createdAt] il
+ * blocco era solo un avviso da leggere prima di poter tornare a mappare.
+ */
+data class UserBlock(
+    val id: Long,
+    val createdAt: Instant?,
+    val endsAt: Instant?,
+    val creator: String?,
+    val reason: String,
+)

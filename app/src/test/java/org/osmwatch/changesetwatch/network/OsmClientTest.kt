@@ -44,6 +44,48 @@ class OsmClientTest {
     }
 
     @Test
+    fun blocks_idsFromWebPage_detailsFromApi() {
+        server.start()
+        val c =
+            OsmClient(
+                baseUrl = server.url("/api/0.6").toString().trimEnd('/'),
+                webUrl = server.url("/").toString().trimEnd('/'),
+                sleep = { sleeps += it },
+            )
+        server.enqueue(
+            MockResponse()
+                .setBody(
+                    """<table><tr><td><a href="/user_blocks/21457">Show</a></td></tr>
+                       <tr><td><a href="/user_blocks/900">Show</a></td></tr></table>"""
+                )
+        )
+        server.enqueue(
+            MockResponse()
+                .setBody(
+                    """<osm><user_block id="21457" created_at="2026-10-20T07:53:39Z"
+                        ends_at="2026-10-22T07:53:39Z"><user uid="1" user="Nix Nada"/>
+                        <creator uid="5164" user="woodpeck"/><reason>Dear user,
+                        please stop.</reason></user_block></osm>"""
+                )
+        )
+        server.enqueue(
+            MockResponse()
+                .setBody("""<osm><user_block id="900"><reason>x</reason></user_block></osm>""")
+        )
+        val blocks = c.fetchBlocks("Nix Nada")
+        assertEquals("/user/Nix%20Nada/blocks", server.takeRequest().path)
+        assertEquals("/api/0.6/user_blocks/21457", server.takeRequest().path)
+        assertEquals("/api/0.6/user_blocks/900", server.takeRequest().path)
+        assertEquals(listOf(21457L, 900L), blocks.map { it.id })
+        val b = blocks[0]
+        assertEquals("woodpeck", b.creator)
+        assertEquals(Instant.parse("2026-10-20T07:53:39Z"), b.createdAt)
+        assertEquals(Instant.parse("2026-10-22T07:53:39Z"), b.endsAt)
+        assertTrue(b.reason.startsWith("Dear user,") && b.reason.endsWith("please stop."))
+        assertEquals(listOf(500L), sleeps) // pausa tra le due richieste all'API
+    }
+
+    @Test
     fun userRequest_hasNameAndTime() {
         server.enqueue(MockResponse().setBody(empty))
         client().fetchChangesetsByUser("Anna B", 100, Instant.parse("2026-01-01T00:00:00Z"))
