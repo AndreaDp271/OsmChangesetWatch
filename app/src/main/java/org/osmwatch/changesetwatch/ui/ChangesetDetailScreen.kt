@@ -31,6 +31,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,6 +47,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -109,7 +116,30 @@ private fun ChangesMap(row: ChangesetRow, geo: GeoState, onElementTap: (ElementR
     val g = (geo as? GeoState.Ready)?.geometry
     val bbox = if (row.bboxMinLat != null) BBox(row.bboxMinLat, row.bboxMinLon!!, row.bboxMaxLat!!, row.bboxMaxLon!!) else null
     Text(stringResource(R.string.map_title), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
-    MiniMap(g, bbox, onElementTap, Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(16.dp)))
+    var full by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    Box {
+        MiniMap(g, bbox, onElementTap, Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(16.dp)))
+        FullscreenButton(expanded = false, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) { full = true }
+    }
+    if (full) androidx.compose.ui.window.Dialog(
+        onDismissRequest = { full = false },
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            MiniMap(g, bbox, onElementTap, Modifier.fillMaxSize())
+            FullscreenButton(expanded = true, modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp)) { full = false }
+            androidx.compose.material3.Surface(
+                modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(12.dp),
+                shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+            ) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Legend(ChangeStyle.NEW, R.string.legend_new)
+                    Legend(ChangeStyle.MODIFIED, R.string.legend_modified)
+                    Legend(ChangeStyle.DELETED, R.string.legend_deleted)
+                }
+            }
+        }
+    }
     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Legend(ChangeStyle.NEW, R.string.legend_new)
         Legend(ChangeStyle.MODIFIED, R.string.legend_modified)
@@ -178,6 +208,18 @@ private fun DiffBody(d: ElementDiff) {
         Row(Modifier.padding(top = 6.dp)) {
             Text(sign, color = c, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp))
             Text(text, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun FullscreenButton(expanded: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    androidx.compose.material3.Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), modifier = modifier) {
+        IconButton(onClick = onClick) {
+            Icon(
+                if (expanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                stringResource(if (expanded) R.string.exit_fullscreen else R.string.fullscreen),
+            )
         }
     }
 }

@@ -98,4 +98,6 @@
     </plurals>
     <string name="source_code">Source code</string>
     <string name="report_issue">Report a problem</string>
+    <string name="fullscreen">Full screen map</string>
+    <string name="exit_fullscreen">Close full screen</string>
 </resources>
