@@ -99,4 +99,5 @@
     <string name="report_issue">Segnala un problema</string>
     <string name="fullscreen">Mappa a schermo intero</string>
     <string name="exit_fullscreen">Chiudi schermo intero</string>
+    <string name="legend_before">Prima</string>
 </resources>

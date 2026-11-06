@@ -35,14 +35,20 @@ object ChangeStyle {
     val NEW = 0xFF2E7D32.toInt()
     val MODIFIED = 0xFFEF6C00.toInt()
     val DELETED = 0xFFC62828.toInt()
+    val BEFORE = 0xFF757575.toInt()
     fun color(a: ChangeAction) = when (a) { ChangeAction.CREATE -> NEW; ChangeAction.MODIFY -> MODIFIED; ChangeAction.DELETE -> DELETED }
 }
 
-private class PointsOverlay(private val points: List<DrawPoint>, private val density: Float) : Overlay() {
+private class PointsOverlay(private val points: List<DrawPoint>, private val beforePoints: List<org.osmwatch.changesetwatch.domain.LatLon>, private val density: Float) : Overlay() {
     private val fill = Paint().apply { style = Paint.Style.FILL; isAntiAlias = true }
     private val ring = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 2.5f * density; isAntiAlias = true }
     private val tmp = Point()
     override fun draw(c: Canvas, pj: Projection) {
+        ring.color = ChangeStyle.BEFORE
+        for (b in beforePoints) { // posizione precedente di un nodo spostato
+            pj.toPixels(GeoPoint(b.lat, b.lon), tmp)
+            c.drawCircle(tmp.x.toFloat(), tmp.y.toFloat(), 5f * density, ring)
+        }
         for (p in points) {
             pj.toPixels(GeoPoint(p.at.lat, p.at.lon), tmp)
             if (p.action == ChangeAction.DELETE) { // cerchio vuoto: elemento che non c'è più
@@ -84,6 +90,14 @@ fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, onElementTap: (ElementRe
         m.tag = geometry
         m.overlays.clear()
         val d = m.resources.displayMetrics.density
+        geometry?.beforeLines?.forEach { l -> // prima della modifica: sotto, grigio sottile
+            m.overlays.add(Polyline().apply {
+                setPoints(l.points.map { GeoPoint(it.lat, it.lon) })
+                outlinePaint.color = ChangeStyle.BEFORE
+                outlinePaint.strokeWidth = 3f * d
+                outlinePaint.pathEffect = DashPathEffect(floatArrayOf(4f * d, 6f * d), 0f)
+            })
+        }
         geometry?.lines?.forEach { l ->
             m.overlays.add(Polyline().apply {
                 setPoints(l.points.map { GeoPoint(it.lat, it.lon) })
@@ -92,7 +106,7 @@ fun MiniMap(geometry: ChangeGeometry?, fallback: BBox?, onElementTap: (ElementRe
                 if (l.action == ChangeAction.DELETE) outlinePaint.pathEffect = DashPathEffect(floatArrayOf(10f * d, 7f * d), 0f)
             })
         }
-        geometry?.points?.takeIf { it.isNotEmpty() }?.let { m.overlays.add(PointsOverlay(it, d)) }
+        geometry?.takeIf { it.points.isNotEmpty() || it.beforePoints.isNotEmpty() }?.let { m.overlays.add(PointsOverlay(it.points, it.beforePoints, d)) }
         if (geometry != null && !geometry.isEmpty) m.overlays.add(TapOverlay(geometry, d) { tapState.value(it) })
         val pts = geometry?.allPoints().orEmpty().map { GeoPoint(it.lat, it.lon) }
         m.post {

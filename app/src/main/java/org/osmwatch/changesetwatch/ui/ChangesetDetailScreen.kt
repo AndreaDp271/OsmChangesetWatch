@@ -136,6 +136,7 @@ private fun ChangesMap(row: ChangesetRow, geo: GeoState, onElementTap: (ElementR
                     Legend(ChangeStyle.NEW, R.string.legend_new)
                     Legend(ChangeStyle.MODIFIED, R.string.legend_modified)
                     Legend(ChangeStyle.DELETED, R.string.legend_deleted)
+                    Legend(ChangeStyle.BEFORE, R.string.legend_before)
                 }
             }
         }
@@ -144,6 +145,7 @@ private fun ChangesMap(row: ChangesetRow, geo: GeoState, onElementTap: (ElementR
         Legend(ChangeStyle.NEW, R.string.legend_new)
         Legend(ChangeStyle.MODIFIED, R.string.legend_modified)
         Legend(ChangeStyle.DELETED, R.string.legend_deleted)
+        Legend(ChangeStyle.BEFORE, R.string.legend_before)
     }
     val note = when {
         geo is GeoState.Loading -> R.string.geo_loading

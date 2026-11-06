@@ -78,8 +78,9 @@ class LiveGeometryTest {
         val id = (System.getenv("OSM_CS") ?: "191555544").toLong()
         val c = OsmClient()
         val s = c.fetchOsmChange(id)
-        val g = org.osmwatch.changesetwatch.domain.GeometryResolver.resolve(s, OsmElementSource(c))
+        val g = org.osmwatch.changesetwatch.domain.GeometryResolver.resolve(s, OsmElementSource(c), includeBefore = true)
         println("LIVE: nodi=${s.nodes.size} way=${s.ways.size} rel=${s.relationCount} -> punti=${g.points.size} linee=${g.lines.size} parziale=${g.partial}")
+        println("LIVE: before linee=${g.beforeLines.size} punti=${g.beforePoints.size}")
         println("LIVE: azioni punti=${g.points.groupBy { it.action }.mapValues { it.value.size }} linee=${g.lines.groupBy { it.action }.mapValues { it.value.size }}")
     }
 }

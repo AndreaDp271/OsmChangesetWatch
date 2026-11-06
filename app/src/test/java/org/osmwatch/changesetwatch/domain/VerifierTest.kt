@@ -88,3 +88,27 @@ class VerifierTest {
         assertTrue(ElementDiffer.diff(ref, DELETE, null, null).previousMissing)
     }
 }
+
+class BeforeGeometryTest {
+    @Test fun modifiedWay_showsPreviousShape_andMovedNodeShowsOldPosition() {
+        // way v2 era [1,2,3]; ora [1,2,4]; il nodo 2 è stato spostato da (5,5) a (6,6)
+        val change = OsmChangeSummary(
+            nodes = listOf(ChangedNode(2, ChangeAction.MODIFY, 6.0, 6.0, 3), ChangedNode(4, ChangeAction.CREATE, 7.0, 7.0, 1), ChangedNode(9, ChangeAction.MODIFY, 20.0, 20.0, 2)),
+            ways = listOf(ChangedWay(100, ChangeAction.MODIFY, 2, listOf(1, 2, 4))),
+            relationCount = 0,
+        )
+        val src = object : ElementSource {
+            override fun nodes(ids: List<VersionedId>): Map<Long, LatLon> {
+                val all = mapOf(1L to LatLon(4.0, 4.0), 3L to LatLon(8.0, 8.0))
+                val prev = mapOf(2L to LatLon(5.0, 5.0), 9L to LatLon(19.0, 19.0)) // v-1 dei nodi modificati
+                return ids.mapNotNull { id -> (if (id.version != null) prev[id.id] else all[id.id])?.let { id.id to it } }.toMap()
+            }
+            override fun ways(ids: List<VersionedId>) = mapOf(100L to listOf(1L, 2L, 3L))
+        }
+        val g = GeometryResolver.resolve(change, src, includeBefore = true)
+        assertEquals(1, g.beforeLines.size)
+        assertEquals(listOf(4.0, 5.0, 8.0), g.beforeLines[0].points.map { it.lat }) // forma precedente con nodo 2 alla vecchia posizione
+        assertEquals(listOf(19.0), g.beforePoints.map { it.lat }) // nodo isolato spostato
+        assertEquals(0, GeometryResolver.resolve(change, src).beforeLines.size) // di default niente "prima"
+    }
+}

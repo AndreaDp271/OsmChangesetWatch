@@ -81,7 +81,7 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
             val s = try {
                 withContext(Dispatchers.IO) {
                     val change = client.fetchOsmChange(row.id)
-                    GeoState.Ready(GeometryResolver.resolve(change, OsmElementSource(client)), change)
+                    GeoState.Ready(GeometryResolver.resolve(change, OsmElementSource(client), includeBefore = true), change)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
