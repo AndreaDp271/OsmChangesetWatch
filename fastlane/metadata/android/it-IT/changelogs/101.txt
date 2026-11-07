@@ -1,0 +1,1 @@
+Una nuova area si apre dove sei, con il pulsante "La mia posizione"; si disegna spostando la mappa sotto un rettangolo fisso.

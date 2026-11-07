@@ -1,0 +1,1 @@
+A new area opens where you are, with a "My location" button; draw it by moving the map under a fixed rectangle.

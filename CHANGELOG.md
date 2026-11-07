@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 (versionCode 101)
+- Area editor: a new area opens where you are (last known location) instead of Rome.
+- "My location" button on the area map; it asks for location only when tapped.
+- Drawing a new area by hand: the rectangle stays fixed on the screen and you move the map under it; the corners resize it.
+
 ## 1.0.0 (versionCode 100)
 - Watch areas drawn on a map, with their size in km² and a warning for large areas.
 - Geometric check of every changeset: only those that really touch the area count; the others sit behind the "Also unverified" filter.

@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- solo per centrare la mappa dell'editor delle aree, su richiesta -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- aggiornamenti scaricati dalle release di GitHub -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 

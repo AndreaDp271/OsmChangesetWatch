@@ -6,6 +6,7 @@
     <string name="area_name">Nome</string>
     <string name="area_km2">≈ %1$,.0f km²</string>
     <string name="area_too_big">area molto grande</string>
+    <string name="map_hint_follow">Sposta la mappa per posizionare l\'area; trascina un angolo per ridimensionarla.</string>
     <string name="map_hint">Trascina gli angoli per ridimensionare, l\'interno per spostare.</string>
     <string name="no_areas">Nessuna area. Tocca + per aggiungerne una.</string>
     <string name="save">Salva</string>
@@ -278,4 +279,6 @@
     <string name="users_trusted">Fidati</string>
     <string name="users_trusted_empty">Ancora nessuno: segna come fidato l\'autore di un changeset.</string>
     <string name="remove_from_list">Togli %1$s</string>
+    <string name="my_location">La mia posizione</string>
+    <string name="location_off">La posizione è disattivata: attivala nelle impostazioni di sistema</string>
 </resources>

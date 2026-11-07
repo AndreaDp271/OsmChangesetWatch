@@ -21,6 +21,9 @@ class BBoxOverlay(
     private val onChange: (BBox) -> Unit,
 ) : Overlay() {
 
+    /** false = trascinare dall'interno sposta la mappa, non il rettangolo (restano gli angoli). */
+    var movable = true
+
     private val fill =
         Paint().apply {
             color = 0x332563EB
@@ -69,7 +72,8 @@ class BBoxOverlay(
                 val nearest = dists.indices.minByOrNull { dists[it] }!!
                 corner = if (dists[nearest] < 32 * density) nearest else -1
                 moving =
-                    corner < 0 &&
+                    movable &&
+                        corner < 0 &&
                         e.x in p[0].x.toFloat()..p[2].x.toFloat() &&
                         e.y in p[0].y.toFloat()..p[2].y.toFloat()
                 last = geo

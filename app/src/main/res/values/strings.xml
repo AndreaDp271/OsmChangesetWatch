@@ -7,6 +7,7 @@
     <string name="area_name">Name</string>
     <string name="area_km2">≈ %1$,.0f km²</string>
     <string name="area_too_big">very large area</string>
+    <string name="map_hint_follow">Move the map to place the area; drag a corner to resize it.</string>
     <string name="map_hint">Drag the corners to resize, the inside to move.</string>
     <string name="no_areas">No areas yet. Tap + to add one.</string>
     <string name="save">Save</string>
@@ -279,4 +280,6 @@
     <string name="users_trusted">Trusted</string>
     <string name="users_trusted_empty">Nobody yet: mark an author as trusted from a changeset.</string>
     <string name="remove_from_list">Remove %1$s</string>
+    <string name="my_location">My location</string>
+    <string name="location_off">Location is off: turn it on in the system settings</string>
 </resources>

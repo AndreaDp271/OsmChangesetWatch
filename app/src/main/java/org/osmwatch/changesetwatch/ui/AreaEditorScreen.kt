@@ -1,7 +1,15 @@
 package org.osmwatch.changesetwatch.ui
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +29,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Public
@@ -34,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,6 +72,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -69,6 +81,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
@@ -76,6 +91,8 @@ import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import org.osmwatch.changesetwatch.R
 import org.osmwatch.changesetwatch.data.WatchArea
 import org.osmwatch.changesetwatch.domain.AreaShape
@@ -108,6 +125,11 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
     // nome messo dalla ricerca: si aggiorna se l'utente non l'ha cambiato
     var autoName by remember { mutableStateOf<String?>(null) }
     var bbox by remember { mutableStateOf(area?.bbox) }
+    // nuova area: il rettangolo è una cornice fissa sullo schermo (sposti la mappa, non lui; gli
+    // angoli cambiano la cornice) finché non scegli un luogo
+    var pinned by remember { mutableStateOf(area != null) }
+    // la cornice in frazioni della vista: sinistra, alto, destra, basso
+    val frame = remember { floatArrayOf(0.3f, 0.3f, 0.7f, 0.7f) }
     var query by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Place>?>(null) }
     var searching by remember { mutableStateOf(false) }
@@ -123,15 +145,39 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
     val map = remember { MapView(context) }
     val box = remember { arrayOfNulls<BBoxOverlay>(1) }
     val shapes = remember { mutableListOf<Overlay>() }
+    // il punto "sei qui": il GPS si accende solo dal pulsante e si spegne quando l'editor va in
+    // secondo piano
+    val me = remember { MyLocationNewOverlay(GpsMyLocationProvider(context), map) }
+    val locationManager = remember { context.getSystemService(LocationManager::class.java) }
+
+    fun hasLocation() =
+        LOCATION_PERMISSIONS.any {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+
+    /** Ultima posizione nota di qualsiasi provider, senza accendere il GPS. */
+    @SuppressLint("MissingPermission")
+    fun lastKnown(): GeoPoint? =
+        if (!hasLocation()) null
+        else
+            locationManager
+                .getProviders(true)
+                .mapNotNull { locationManager.getLastKnownLocation(it) }
+                .maxByOrNull { it.time }
+                ?.let { GeoPoint(it.latitude, it.longitude) }
 
     DisposableEffect(lifecycle) {
         val obs = LifecycleEventObserver { _, e ->
             if (e == Lifecycle.Event.ON_RESUME) map.onResume()
-            if (e == Lifecycle.Event.ON_PAUSE) map.onPause()
+            if (e == Lifecycle.Event.ON_PAUSE) {
+                map.onPause()
+                me.disableMyLocation()
+            }
         }
         lifecycle.addObserver(obs)
         onDispose {
             lifecycle.removeObserver(obs)
+            me.disableMyLocation()
             map.onDetach()
         }
     }
@@ -195,7 +241,33 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
         map.invalidate()
     }
 
+    /** L'area sotto la cornice, nella vista attuale. */
+    fun frameBox(): BBox {
+        val pj = map.projection
+        val nw = pj.fromPixels((frame[0] * map.width).toInt(), (frame[1] * map.height).toInt())
+        val se = pj.fromPixels((frame[2] * map.width).toInt(), (frame[3] * map.height).toInt())
+        return BBox(se.latitude, nw.longitude, nw.latitude, se.longitude)
+    }
+
+    /** La cornice dopo che hai trascinato un angolo. */
+    fun setFrame(b: BBox) {
+        val pj = map.projection
+        val nw = pj.toPixels(GeoPoint(b.maxLat, b.minLon), null)
+        val se = pj.toPixels(GeoPoint(b.minLat, b.maxLon), null)
+        frame[0] = nw.x.toFloat() / map.width
+        frame[1] = nw.y.toFloat() / map.height
+        frame[2] = se.x.toFloat() / map.width
+        frame[3] = se.y.toFloat() / map.height
+    }
+
+    /** Il rettangolo smette di seguire la vista: da qui si sposta solo a mano. */
+    fun pin() {
+        pinned = true
+        box[0]?.movable = true
+    }
+
     fun choose(p: Place) {
+        pin()
         val dens = context.resources.displayMetrics.density
         bbox = p.bbox
         boundary = p.outline.takeIf { it.isNotEmpty() }
@@ -235,6 +307,25 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
         }
     }
 
+    fun moveTo(p: GeoPoint) = map.controller.animateTo(p, 14.0, 600L)
+
+    fun showMe() {
+        if (!LocationManagerCompat.isLocationEnabled(locationManager)) {
+            Toast.makeText(context, R.string.location_off, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (me !in map.overlays) map.overlays.add(me)
+        me.enableMyLocation()
+        val now = me.myLocation ?: lastKnown()
+        if (now != null) moveTo(now)
+        else me.runOnFirstFix { map.post { me.myLocation?.let(::moveTo) } }
+    }
+
+    val askLocation =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            if (it.values.any { granted -> granted }) showMe()
+        }
+
     fun useRectangle() {
         boundary = null
         boundaryName = null
@@ -272,29 +363,16 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     controller.setZoom(13.0)
                     controller.setCenter(
-                        GeoPoint(
-                            area?.let { (it.minLat + it.maxLat) / 2 } ?: 41.9,
-                            area?.let { (it.minLon + it.maxLon) / 2 } ?: 12.5,
-                        )
+                        area?.let {
+                            GeoPoint((it.minLat + it.maxLat) / 2, (it.minLon + it.maxLon) / 2)
+                        } ?: lastKnown() ?: GeoPoint(41.9, 12.5) // senza posizione: Roma
                     )
                     val dens = resources.displayMetrics.density
                     post {
                         if (
                             box[0] == null
                         ) { // primo disegno: crea il rettangolo (resta nascosto se c'è un confine)
-                            val start =
-                                bbox
-                                    ?: boundingBox.let { // nuova area: 40% centrale della vista
-                                        val dLat = (it.latNorth - it.latSouth) * 0.3
-                                        val dLon = (it.lonEast - it.lonWest) * 0.3
-                                        BBox(
-                                                it.latSouth + dLat,
-                                                it.lonWest + dLon,
-                                                it.latNorth - dLat,
-                                                it.lonEast - dLon,
-                                            )
-                                            .also { b -> bbox = b }
-                                    }
+                            val start = bbox ?: frameBox().also { b -> bbox = b }
                             if (area != null) {
                                 zoomToBoundingBox(
                                     BoundingBox(
@@ -307,8 +385,28 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
                                     (48 * dens).toInt(),
                                 )
                             }
-                            box[0] = BBoxOverlay(start, dens) { bbox = it }
+                            box[0] =
+                                BBoxOverlay(start, dens) {
+                                        bbox = it
+                                        if (!pinned) setFrame(it)
+                                    }
+                                    .also { it.movable = pinned }
                             render()
+                            addMapListener(
+                                object : MapListener {
+                                    override fun onScroll(e: ScrollEvent?) = follow()
+
+                                    override fun onZoom(e: ZoomEvent?) = follow()
+
+                                    fun follow(): Boolean {
+                                        if (!pinned && boundary == null) {
+                                            bbox = frameBox()
+                                            render()
+                                        }
+                                        return false
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -422,113 +520,137 @@ fun AreaEditorScreen(area: WatchArea?, onSave: (WatchArea) -> Unit, onBack: () -
             }
         }
 
-        // in basso: nome, superficie, salva
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 8.dp,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+        // in basso: posizione, poi nome, superficie, salva
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(Modifier.padding(16.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.area_name)) },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                bbox?.let {
-                    val km2 =
-                        boundary?.let { r -> AreaShape(it, r).areaKm2() } ?: Geometry.areaKm2(it)
-                    val big = km2 > Geometry.WARN_AREA_KM2
-                    Row(
-                        Modifier.padding(top = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            if (big) Icons.Default.Warning else Icons.Default.SquareFoot,
-                            null,
-                            Modifier.size(20.dp),
-                            tint =
-                                if (big) MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            stringResource(R.string.area_km2, km2),
-                            style = MaterialTheme.typography.titleMedium.tabular(),
-                            fontWeight = FontWeight.SemiBold,
-                            color =
-                                if (big) MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
-                    if (big)
-                        Text(
-                            stringResource(R.string.area_too_big),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                }
-                if (boundary != null) {
-                    Row(
-                        Modifier.padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Default.LocationCity,
-                            null,
-                            Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+            SmallFloatingActionButton(
+                onClick = {
+                    if (hasLocation()) showMe() else askLocation.launch(LOCATION_PERMISSIONS)
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Icon(Icons.Default.MyLocation, stringResource(R.string.my_location))
+            }
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 8.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.area_name)) },
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    bbox?.let {
+                        val km2 =
+                            boundary?.let { r -> AreaShape(it, r).areaKm2() }
+                                ?: Geometry.areaKm2(it)
+                        val big = km2 > Geometry.WARN_AREA_KM2
+                        Row(
+                            Modifier.padding(top = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                if (big) Icons.Default.Warning else Icons.Default.SquareFoot,
+                                null,
+                                Modifier.size(20.dp),
+                                tint =
+                                    if (big) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.primary,
+                            )
                             Text(
-                                stringResource(R.string.boundary_of, boundaryName ?: name),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
+                                stringResource(R.string.area_km2, km2),
+                                style = MaterialTheme.typography.titleMedium.tabular(),
+                                fontWeight = FontWeight.SemiBold,
+                                color =
+                                    if (big) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                        if (big)
+                            Text(
+                                stringResource(R.string.area_too_big),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                    }
+                    if (boundary != null) {
+                        Row(
+                            Modifier.padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Default.LocationCity,
+                                null,
+                                Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text(
+                                    stringResource(R.string.boundary_of, boundaryName ?: name),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Muted(
+                                    stringResource(
+                                        if (boundaryLoading) R.string.boundary_loading
+                                        else R.string.boundary_hint
+                                    )
+                                )
+                            }
+                            TextButton(onClick = ::useRectangle) {
+                                Text(stringResource(R.string.use_rectangle))
+                            }
+                        }
+                    } else {
+                        Row(
+                            Modifier.padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Default.OpenWith,
+                                null,
+                                Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Muted(
                                 stringResource(
-                                    if (boundaryLoading) R.string.boundary_loading
-                                    else R.string.boundary_hint
-                                )
+                                    if (pinned) R.string.map_hint else R.string.map_hint_follow
+                                ),
+                                Modifier.padding(start = 8.dp),
                             )
                         }
-                        TextButton(onClick = ::useRectangle) {
-                            Text(stringResource(R.string.use_rectangle))
-                        }
                     }
-                } else {
-                    Row(
-                        Modifier.padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    Button(
+                        onClick = ::save,
+                        enabled = name.isNotBlank() && bbox != null,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     ) {
-                        Icon(
-                            Icons.Default.OpenWith,
-                            null,
-                            Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Icon(Icons.Default.Check, null, Modifier.size(18.dp))
+                        Text(
+                            stringResource(R.string.save_area),
+                            modifier = Modifier.padding(start = 8.dp),
                         )
-                        Muted(stringResource(R.string.map_hint), Modifier.padding(start = 8.dp))
                     }
-                }
-                Button(
-                    onClick = ::save,
-                    enabled = name.isNotBlank() && bbox != null,
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                ) {
-                    Icon(Icons.Default.Check, null, Modifier.size(18.dp))
-                    Text(
-                        stringResource(R.string.save_area),
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
                 }
             }
         }
     }
 }
+
+private val LOCATION_PERMISSIONS =
+    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 @Composable
 private fun PlaceRow(p: Place, onClick: () -> Unit) {
