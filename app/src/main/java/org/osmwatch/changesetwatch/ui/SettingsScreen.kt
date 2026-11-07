@@ -63,6 +63,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import java.io.File
 import org.osmwatch.changesetwatch.BuildConfig
 import org.osmwatch.changesetwatch.R
@@ -387,7 +388,12 @@ private fun UpdatesGroup(prefs: Prefs, version: String) {
                         LinearProgressIndicator({ s.progress }, Modifier.fillMaxWidth())
                     is Updater.State.Installing -> LinearProgressIndicator(Modifier.fillMaxWidth())
                     else -> {
-                        val allowed = Updater.canInstall(ctx)
+                        // si riattiva tornando dalle impostazioni di sistema: rileggi al resume
+                        var allowed by remember { mutableStateOf(Updater.canInstall(ctx)) }
+                        LifecycleResumeEffect(Unit) {
+                            allowed = Updater.canInstall(ctx)
+                            onPauseOrDispose {}
+                        }
                         Button(
                             onClick = {
                                 if (Updater.canInstall(ctx))
