@@ -453,8 +453,7 @@ private fun AppCard(version: String) {
                 contentAlignment = Alignment.Center,
             ) {
                 // il disegno occupa il centro del riquadro di 108 dp: si ingrandisce e il bordo
-                // vuoto
-                // resta fuori dal clip, come fa il launcher
+                // vuoto resta fuori dal clip, come fa il launcher
                 Image(
                     painterResource(R.drawable.ic_launcher_foreground),
                     null,

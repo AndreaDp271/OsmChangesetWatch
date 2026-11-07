@@ -530,9 +530,8 @@ private fun AuthorCard(
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.watch_user_btn))
                 }
-                // spento = grigio, acceso = pieno nel colore del significato: prima l'icona
-                // colorata
-                // del chip spento sembrava già attiva
+                // spento = grigio, acceso = pieno nel colore del significato: con l'icona
+                // colorata il chip spento sembrava già attivo
                 FilterChip(
                     selected = suspect,
                     onClick = onSuspect,

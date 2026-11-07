@@ -14,8 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import org.osmwatch.changesetwatch.data.AppSettings
 
-// Palette condivisa con ParkMap (stesso blu e stessi neutri freddi): le app devono avere lo stesso
-// stile.
+// Palette condivisa con ParkMap (stesso blu, stessi neutri freddi): le due app sono coordinate.
 private val Light =
     lightColorScheme(
         primary = Color(0xFF2563EB),

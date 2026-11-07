@@ -49,8 +49,7 @@ class PollWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
                 Log.w(TAG, "area=${area.name} errore: ${e.message}")
             }
         }
-        // tutte fallite (rete/server): riprova col backoff di WorkManager, lastCheckedAt non è
-        // avanzato
+        // tutte fallite (rete/server): riprova col backoff, senza avanzare lastCheckedAt
         return if (areas.isNotEmpty() && failures == areas.size) Result.retry()
         else Result.success()
     }

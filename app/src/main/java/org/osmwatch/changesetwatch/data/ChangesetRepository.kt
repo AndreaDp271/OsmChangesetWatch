@@ -53,7 +53,8 @@ class ChangesetRepository(
 
     /**
      * Controllo periodico: changeset chiusi dopo lastCheckedAt (−5 min) o ancora aperti, con
-     * paginazione. Primo controllo (lastCheckedAt null): solo "seed" degli ultimi 100, restituisce
+     * paginazione. Ritorna solo quelli di quella finestra confermati nell'area, cioè ciò che va
+     * notificato. Primo controllo (lastCheckedAt null): solo "seed" degli ultimi 100, restituisce
      * lista vuota (niente notifica a pioggia).
      */
     suspend fun refreshIncremental(area: WatchArea): List<ChangesetRow> {
@@ -74,7 +75,11 @@ class ChangesetRepository(
                 }
             }
         store(area, fetched.map { it.toRow(area.id, Verdict.PENDING, now) }, now)
-        return verifyPending(area)
+        // la coda PENDING contiene anche l'arretrato di "Carica altri": notifica solo ciò che è
+        // stato chiuso dopo il controllo precedente (o è ancora aperto)
+        // shortcut: un nuovo changeset rimasto PENDING oltre il suo giro non viene notificato;
+        // se capita spesso, salvare in tabella chi è già stato notificato
+        return verifyPending(area).filter { (it.closedAt ?: now) >= since.toEpochMilli() }
     }
 
     /**

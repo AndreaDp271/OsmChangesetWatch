@@ -59,8 +59,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // nuove versioni su GitHub: al massimo una volta al giorno, senza disturbare se non c'è
-        // nulla
+        // nuove versioni su GitHub: al massimo una volta al giorno, in silenzio se non c'è nulla
         val p = Prefs(this)
         if (
             BuildConfig.UPDATER &&
@@ -90,8 +89,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppSettings.init(this)
-        // osmdroid: UA obbligatorio per la tile policy OSM; cache nella cache privata (nessun
-        // permesso storage)
+        // osmdroid: UA obbligatorio per la tile policy OSM; cache privata, nessun permesso storage
         Configuration.getInstance().apply {
             userAgentValue = OsmConfig.USER_AGENT
             osmdroidBasePath = File(cacheDir, "osmdroid")
