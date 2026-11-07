@@ -63,7 +63,7 @@ private class PointsOverlay(
     private val ring =
         Paint().apply {
             style = Paint.Style.STROKE
-            strokeWidth = 2.5f * density
+            strokeWidth = 1.5f * density
             isAntiAlias = true
         }
     private val tmp = Point()
@@ -72,16 +72,16 @@ private class PointsOverlay(
         ring.color = ChangeStyle.BEFORE
         for (b in beforePoints) { // posizione precedente di un nodo spostato
             pj.toPixels(GeoPoint(b.lat, b.lon), tmp)
-            c.drawCircle(tmp.x.toFloat(), tmp.y.toFloat(), 5f * density, ring)
+            c.drawCircle(tmp.x.toFloat(), tmp.y.toFloat(), 3.5f * density, ring)
         }
         for (p in points) {
             pj.toPixels(GeoPoint(p.at.lat, p.at.lon), tmp)
             if (p.action == ChangeAction.DELETE) { // cerchio vuoto: elemento che non c'è più
                 ring.color = ChangeStyle.DELETED
-                c.drawCircle(tmp.x.toFloat(), tmp.y.toFloat(), 6f * density, ring)
+                c.drawCircle(tmp.x.toFloat(), tmp.y.toFloat(), 4f * density, ring)
             } else {
                 fill.color = ChangeStyle.color(p.action)
-                c.drawCircle(tmp.x.toFloat(), tmp.y.toFloat(), 5f * density, fill)
+                c.drawCircle(tmp.x.toFloat(), tmp.y.toFloat(), 3.5f * density, fill)
             }
         }
     }
@@ -145,8 +145,8 @@ fun MiniMap(
                     Polyline().apply {
                         setPoints(l.points.map { GeoPoint(it.lat, it.lon) })
                         outlinePaint.color = ChangeStyle.BEFORE
-                        outlinePaint.strokeWidth = 3f * d
-                        outlinePaint.pathEffect = DashPathEffect(floatArrayOf(4f * d, 6f * d), 0f)
+                        outlinePaint.strokeWidth = 1.5f * d
+                        outlinePaint.pathEffect = DashPathEffect(floatArrayOf(3f * d, 4f * d), 0f)
                     }
                 )
             }
@@ -156,10 +156,10 @@ fun MiniMap(
                         setPoints(l.points.map { GeoPoint(it.lat, it.lon) })
                         outlinePaint.color = ChangeStyle.color(l.action)
                         outlinePaint.strokeWidth =
-                            (if (l.action == ChangeAction.CREATE) 5f else 4f) * d
+                            (if (l.action == ChangeAction.CREATE) 2.5f else 2f) * d
                         if (l.action == ChangeAction.DELETE)
                             outlinePaint.pathEffect =
-                                DashPathEffect(floatArrayOf(10f * d, 7f * d), 0f)
+                                DashPathEffect(floatArrayOf(6f * d, 4f * d), 0f)
                     }
                 )
             }
