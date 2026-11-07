@@ -1,16 +1,13 @@
 # Changelog
 
 ## 1.0.0 (versionCode 100)
-- Aree di osservazione su mappa (osmdroid), con superficie in km² e avviso per aree grandi.
-- Verifica geometrica dei changeset: solo quelli che toccano davvero l'area (CONFIRMED); gli altri dietro il filtro "Anche non verificati".
-- Minimappa del changeset: nuovo (verde), modificato (arancione), eliminato (rosso tratteggiato); tocco su un elemento per vedere i tag cambiati.
-- Minimappa a schermo intero (pulsante in alto a destra sulla mappa), con legenda e tocco sugli elementi.
-- Elementi modificati: la forma precedente (grigio tratteggiato) resta visibile sotto quella nuova; i nodi spostati mostrano la vecchia posizione.
-- Controllo in background (WorkManager) con notifiche raggruppate per area; intervallo da 15 min a 6 h.
-- Impostazioni nello stile ParkMap: tema, colori (blu o Material You), lingua (it/en), filtro, cache mappa.
-- Italiano e inglese; nessun servizio proprietario, nessun tracker.
-
-## Unreleased
+- Watch areas drawn on a map, with their size in km² and a warning for large areas.
+- Geometric check of every changeset: only those that really touch the area count; the others sit behind the "Also unverified" filter.
+- Changeset mini-map: new (green), modified (orange), deleted (dashed red); tap an element for its changed tags. Full-screen map with legend.
+- Modified elements keep their previous shape (dashed grey) under the new one; moved nodes show their old position.
+- Background check (WorkManager) with one notification per area; interval from 15 min to 6 h.
+- Settings in ParkMap style: theme, colours (blue or Material You), language (it/en), filter, map cache.
+- Italian and English; no proprietary services, no trackers.
 - Search box in the list (user, comment, editor, id); "Only my areas" filter off = global search by OSM user name or changeset id.
 - Opens openstreetmap.org/changeset/ID links from other apps and browsers.
 - OSMCha-style flags (many changes, no comment, mass deletion, new mapper, previously blocked, suspect user) and trusted/suspect user lists.
@@ -33,3 +30,4 @@
 - Users screen (icon in the list bar): watched, suspect and trusted users; tap a name for their changesets, remove with the cross.
 - Suspect and trusted exclude each other; the chips are grey when off and coloured when on.
 - The list keeps its scroll position when you come back from a changeset.
+- Notifications count only changesets closed since the previous check, not the older backlog being verified.
