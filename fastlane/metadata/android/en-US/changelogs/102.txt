@@ -1,0 +1,1 @@
+Thinner lines and points on the changeset maps; the update card notices the install permission right away.

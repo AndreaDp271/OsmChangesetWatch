@@ -1,0 +1,1 @@
+Linee e punti più sottili sulle mappe dei changeset; la scheda aggiornamenti si accorge subito del permesso di installazione.

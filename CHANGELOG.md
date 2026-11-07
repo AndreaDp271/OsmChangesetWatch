@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 (versionCode 102)
+- Thinner lines and points on the changeset maps, like OSMCha.
+- Settings: the "Allow installation" card disappears as soon as you come back with the permission granted.
+
 ## 1.0.1 (versionCode 101)
 - Area editor: a new area opens where you are (last known location) instead of Rome.
 - "My location" button on the area map; it asks for location only when tapped.
