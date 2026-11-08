@@ -155,6 +155,8 @@
     <string name="watch_user_add">Segui</string>
     <string name="watched_user_desc">Utente · tutte le aree</string>
     <string name="watch_user_btn">Segui utente</string>
+    <string name="watch_user_following">Seguito</string>
+    <string name="update_banner">Disponibile la versione %1$s: tocca per aggiornare</string>
     <string name="watch_user_added">Segui %1$s</string>
     <string name="v_pending">Da verificare</string>
     <string name="v_confirmed">Nell\'area</string>

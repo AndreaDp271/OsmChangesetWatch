@@ -156,6 +156,8 @@
     <string name="watch_user_add">Watch</string>
     <string name="watched_user_desc">User · all areas</string>
     <string name="watch_user_btn">Watch user</string>
+    <string name="watch_user_following">Watching</string>
+    <string name="update_banner">Version %1$s is available: tap to update</string>
     <string name="watch_user_added">Watching %1$s</string>
     <string name="v_pending">To check</string>
     <string name="v_confirmed">In area</string>

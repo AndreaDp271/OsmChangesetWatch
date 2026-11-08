@@ -118,6 +118,7 @@ data class UserInfo(
     val blocksReceived: Int?,
     val roles: List<String> = emptyList(),
     val traces: Int? = null,
+    val imageUrl: String? = null,
 )
 
 /**

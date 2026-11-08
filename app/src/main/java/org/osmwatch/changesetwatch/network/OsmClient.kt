@@ -5,6 +5,7 @@ import java.time.Instant
 import java.util.concurrent.TimeUnit
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -87,6 +88,10 @@ class OsmClient(
         } catch (e: OsmHttpException) {
             if (e.code == 404 || e.code == 410) null else throw e
         }
+
+    /** Byte dell'immagine profilo (URL da [UserInfo.imageUrl]); null se l'URL non è valido. */
+    fun fetchImage(url: String): ByteArray? =
+        url.toHttpUrlOrNull()?.let { u -> execute(u) { it.body!!.bytes() } }
 
     /**
      * [closedAfter]: solo chiusi dopo T1 o ancora aperti (`time=T1`); con [createdBefore] anche

@@ -10,7 +10,7 @@ class UserParserTest {
         val u =
             UserParser.parse(
                 """<osm><user id="1" display_name="Anna" account_created="2020-01-02T03:04:05Z">
-            <description>x</description><roles><moderator/></roles><changesets count="42"/><traces count="3"/>
+            <description>x</description><img href="https://example.org/a.png"/><roles><moderator/></roles><changesets count="42"/><traces count="3"/>
             <blocks><received count="2" active="0"/><issued count="0" active="0"/></blocks></user></osm>"""
                     .byteInputStream()
             )!!
@@ -20,10 +20,15 @@ class UserParserTest {
         assertEquals(2, u.blocksReceived)
         assertEquals(listOf("moderator"), u.roles)
         assertEquals(3, u.traces)
+        assertEquals("https://example.org/a.png", u.imageUrl)
     }
 
     @Test
     fun noUserElementIsNull() {
         assertNull(UserParser.parse("<osm/>".byteInputStream()))
+        assertNull(
+            UserParser.parse("""<osm><user id="1" display_name="B"/></osm>""".byteInputStream())!!
+                .imageUrl
+        )
     }
 }

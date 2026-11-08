@@ -2,9 +2,12 @@ package org.osmwatch.changesetwatch.ui
 
 import android.app.Application
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -227,6 +230,12 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
         areasOnly.value = false
         query.value = user
         searchGlobal()
+    }
+
+    /** Esce dalla ricerca globale: di nuovo la lista delle aree, senza il testo cercato. */
+    fun backToAreas() {
+        areasOnly.value = true
+        query.value = ""
     }
 
     /**
@@ -473,23 +482,43 @@ class ChangesetsViewModel(app: Application) : AndroidViewModel(app) {
     val userInfo = MutableStateFlow<UserInfo?>(null)
     private val userCache = HashMap<Long, UserInfo?>()
     private var userFor = 0L
+    val userAvatar = MutableStateFlow<ImageBitmap?>(null)
+    private val avatarCache = HashMap<Long, ImageBitmap?>()
 
     fun loadUser(uid: Long?) {
         userFor = uid ?: 0L
         if (uid == null) {
             userInfo.value = null
+            userAvatar.value = null
             return
         }
         if (userCache.containsKey(uid)) {
             userInfo.value = userCache[uid]
+            userAvatar.value = avatarCache[uid]
             return
         }
         userInfo.value = null
+        userAvatar.value = null
         viewModelScope.launch {
             attempt { // se fallisce resta null: la scheda autore non mostra il profilo
                 val u = withContext(Dispatchers.IO) { client.fetchUser(uid) }
                 userCache[uid] = u
                 if (userFor == uid) userInfo.value = u
+                // avatar facoltativo: se manca o fallisce resta l'icona generica
+                val img =
+                    u?.imageUrl?.let { url ->
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                    client.fetchImage(url)?.let {
+                                        BitmapFactory.decodeByteArray(it, 0, it.size)
+                                            ?.asImageBitmap()
+                                    }
+                                }
+                                .getOrNull()
+                        }
+                    }
+                avatarCache[uid] = img
+                if (userFor == uid) userAvatar.value = img
             }
         }
     }

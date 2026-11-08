@@ -19,6 +19,7 @@ object UserParser {
         var inRoles = false
         val roles = mutableListOf<String>()
         var traces: Int? = null
+        var image: String? = null
         while (p.next() != XmlPullParser.END_DOCUMENT) {
             if (p.eventType == XmlPullParser.END_TAG && p.name == "blocks") inBlocks = false
             if (p.eventType == XmlPullParser.END_TAG && p.name == "roles") inRoles = false
@@ -37,12 +38,14 @@ object UserParser {
                         changesets = p.getAttributeValue(null, "count")?.toIntOrNull()
                 "blocks" -> inBlocks = true
                 "roles" -> inRoles = true
+                "img" -> if (found) image = p.getAttributeValue(null, "href")
                 "traces" -> if (found) traces = p.getAttributeValue(null, "count")?.toIntOrNull()
                 "received" ->
                     if (inBlocks) blocks = p.getAttributeValue(null, "count")?.toIntOrNull()
                 else -> if (inRoles) roles += p.name
             }
         }
-        return if (found) UserInfo(name, created, changesets, blocks, roles, traces) else null
+        return if (found) UserInfo(name, created, changesets, blocks, roles, traces, image)
+        else null
     }
 }

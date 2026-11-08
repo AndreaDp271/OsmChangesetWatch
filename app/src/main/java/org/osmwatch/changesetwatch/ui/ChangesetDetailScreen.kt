@@ -4,6 +4,7 @@ import android.net.Uri
 import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Event
@@ -83,7 +85,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -132,6 +136,8 @@ fun ChangesetDetailScreen(
     val diff by vm.diffState.collectAsState()
     val discussion by vm.discussion.collectAsState()
     val userInfo by vm.userInfo.collectAsState()
+    val userAvatar by vm.userAvatar.collectAsState()
+    val areas by vm.areas.collectAsState()
     val suspects by vm.suspectUsers.collectAsState()
     val trusted by vm.trustedUsers.collectAsState()
     val loggedIn by vm.loggedIn.collectAsState()
@@ -270,6 +276,8 @@ fun ChangesetDetailScreen(
                         u,
                         r.uid,
                         userInfo,
+                        userAvatar,
+                        areas.any { it.watchUser == u },
                         u in suspects,
                         u in trusted,
                         onWatch = {
@@ -446,6 +454,8 @@ private fun AuthorCard(
     name: String,
     uid: Long?,
     info: UserInfo?,
+    avatar: ImageBitmap?,
+    watched: Boolean,
     suspect: Boolean,
     trusted: Boolean,
     onWatch: () -> Unit,
@@ -472,7 +482,14 @@ private fun AuthorCard(
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
+                    if (avatar != null)
+                        Image(
+                            avatar,
+                            null,
+                            Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    else Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
                 }
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(
@@ -525,10 +542,20 @@ private fun AuthorCard(
                 Modifier.padding(top = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                FilledTonalButton(onClick = onWatch) {
-                    Icon(Icons.Default.NotificationsActive, null, Modifier.size(18.dp))
+                // già seguito: disattivato; si smette da Utenti/Aree (cancella anche i suoi
+                // changeset)
+                FilledTonalButton(onClick = onWatch, enabled = !watched) {
+                    Icon(
+                        if (watched) Icons.Default.Check else Icons.Default.NotificationsActive,
+                        null,
+                        Modifier.size(18.dp),
+                    )
                     Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.watch_user_btn))
+                    Text(
+                        stringResource(
+                            if (watched) R.string.watch_user_following else R.string.watch_user_btn
+                        )
+                    )
                 }
                 // spento = grigio, acceso = pieno nel colore del significato: con l'icona
                 // colorata il chip spento sembrava già attivo

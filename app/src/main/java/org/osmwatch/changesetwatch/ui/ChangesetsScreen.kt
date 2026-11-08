@@ -1,5 +1,6 @@
 package org.osmwatch.changesetwatch.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -141,12 +142,15 @@ fun ChangesetsScreen(
     val suspects by vm.suspectUsers.collectAsState()
     var sheet by rememberSaveable { mutableStateOf(false) }
     val byId = areas.associateBy { it.id }
+    // dalla ricerca globale (es. changeset di un utente) indietro torna alle aree
+    BackHandler(enabled = !areasOnly, onBack = vm::backToAreas)
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     AreaPicker(areas, areaFilter, rows.size, areasOnly) {
+                        if (!areasOnly) vm.backToAreas()
                         vm.areaFilter.value = it
                         vm.loadMoreResult.value = null
                     }
@@ -231,6 +235,21 @@ fun ChangesetsScreen(
                     )
                 }
             }
+            (Updater.state.collectAsState().value as? Updater.State.Available)?.let {
+                Surface(
+                    onClick = onSettings,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.update_banner, it.release.version),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
             PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = vm::refresh,
@@ -279,7 +298,7 @@ private fun AreaPicker(
             else ->
                 areas.firstOrNull { it.id == selected }?.name ?: stringResource(R.string.all_areas)
         }
-    val pickable = areasOnly && areas.isNotEmpty()
+    val pickable = areas.isNotEmpty()
     Box {
         Column(
             Modifier.clip(RoundedCornerShape(12.dp))
