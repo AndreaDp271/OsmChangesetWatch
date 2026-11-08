@@ -1,0 +1,1 @@
+Profile pictures in the author card; the Watch button shows when you already follow someone; update banner; Back returns from a user's changesets to your areas.

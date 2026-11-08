@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3 (versionCode 103)
+- Author card: the OSM profile picture (uploaded or Gravatar) instead of the generic icon.
+- "Watch user" turns into a disabled "Watching" once you follow that user; unfollow from Users or Areas.
+- A banner at the top of the list when an update is available; it opens Settings.
+- After opening a user's changesets, Back or the area menu in the title bring you back to your areas.
+
 ## 1.0.2 (versionCode 102)
 - Thinner lines and points on the changeset maps, like OSMCha.
 - Settings: the "Allow installation" card disappears as soon as you come back with the permission granted.

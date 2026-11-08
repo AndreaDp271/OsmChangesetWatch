@@ -1,0 +1,1 @@
+Immagini profilo nella scheda autore; il pulsante Segui mostra se segui già l'utente; avviso di aggiornamento; Indietro torna dai changeset di un utente alle aree.
