@@ -42,6 +42,12 @@
     <string name="settings">Impostazioni</string>
     <string name="notifications">Notifiche</string>
     <string name="poll_interval">Intervallo di controllo</string>
+    <string name="group_permissions">Permessi</string>
+    <string name="perm_notifications">Notifiche</string>
+    <string name="perm_battery">Nessuna ottimizzazione batteria</string>
+    <string name="perm_background">Attività in background</string>
+    <string name="perm_ok">Attivo</string>
+    <string name="perm_fix">Bloccato: tocca per sistemare</string>
     <string name="doze_note">I controlli girano in background tramite lo scheduler di sistema: i tempi sono approssimativi e possono slittare per il risparmio energetico (Doze).</string>
     <string name="channel_name">Nuovi changeset</string>
     <plurals name="new_changesets">

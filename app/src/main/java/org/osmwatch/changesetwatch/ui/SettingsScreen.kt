@@ -1,9 +1,12 @@
 package org.osmwatch.changesetwatch.ui
 
 import android.app.Activity
+import android.app.ActivityManager
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
@@ -24,7 +27,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -35,10 +40,13 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -57,12 +65,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import java.io.File
 import org.osmwatch.changesetwatch.BuildConfig
@@ -254,6 +264,63 @@ fun SettingsScreen(
                     prefs.intervalMinutes = it
                     PollWorker.schedule(ctx, it)
                 }
+            }
+
+            // stato dei permessi che servono ai controlli in background; riletti tornando
+            // dalle impostazioni di sistema
+            var permTick by remember { mutableIntStateOf(0) }
+            LifecycleResumeEffect(Unit) {
+                permTick++
+                onPauseOrDispose {}
+            }
+            val notifOk =
+                remember(permTick) { NotificationManagerCompat.from(ctx).areNotificationsEnabled() }
+            val batteryOk =
+                remember(permTick) {
+                    ctx.getSystemService(PowerManager::class.java)
+                        .isIgnoringBatteryOptimizations(ctx.packageName)
+                }
+            val backgroundOk =
+                remember(permTick) {
+                    Build.VERSION.SDK_INT < 28 ||
+                        !ctx.getSystemService(ActivityManager::class.java).isBackgroundRestricted
+                }
+            val appDetails = {
+                ctx.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:${ctx.packageName}"),
+                    )
+                )
+            }
+            Group(stringResource(R.string.group_permissions)) {
+                PermissionItem(Icons.Filled.Notifications, R.string.perm_notifications, notifOk) {
+                    ctx.startActivity(
+                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                    )
+                }
+                Divider()
+                PermissionItem(Icons.Filled.BatterySaver, R.string.perm_battery, batteryOk) {
+                    // la richiesta diretta può mancare su alcune ROM: ripiega sui dettagli app
+                    try {
+                        ctx.startActivity(
+                            Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:${ctx.packageName}"),
+                            )
+                        )
+                    } catch (_: ActivityNotFoundException) {
+                        appDetails()
+                    }
+                }
+                Divider()
+                PermissionItem(
+                    Icons.Filled.Sync,
+                    R.string.perm_background,
+                    backgroundOk,
+                    appDetails,
+                )
             }
 
             Group(stringResource(R.string.group_filter)) {
@@ -486,3 +553,22 @@ private fun AppCard(version: String) {
         }
     }
 }
+
+/** Riga di stato di un permesso: "attivo" o "da sistemare"; il tocco apre la pagina di sistema. */
+@Composable
+private fun PermissionItem(icon: ImageVector, title: Int, ok: Boolean, onClick: () -> Unit) =
+    Item(
+        icon,
+        SetColors.general,
+        stringResource(title),
+        stringResource(if (ok) R.string.perm_ok else R.string.perm_fix),
+        trailing = {
+            Icon(
+                if (ok) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                null,
+                tint =
+                    if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        },
+        onClick = onClick,
+    )
