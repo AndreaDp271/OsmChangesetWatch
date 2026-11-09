@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4 (versionCode 104)
+- Settings: new "Permissions" group with the state of notifications, battery optimization and background activity; each row opens the system page to fix it.
+- The app can ask to be excluded from battery optimization, so background checks run more regularly.
+
 ## 1.0.3 (versionCode 103)
 - Author card: the OSM profile picture (uploaded or Gravatar) instead of the generic icon.
 - "Watch user" turns into a disabled "Watching" once you follow that user; unfollow from Users or Areas.

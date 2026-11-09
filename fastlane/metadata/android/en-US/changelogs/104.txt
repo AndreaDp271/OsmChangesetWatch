@@ -1,0 +1,1 @@
+Settings: a Permissions group shows whether notifications, battery optimization and background activity are OK, and opens the system page to fix them.

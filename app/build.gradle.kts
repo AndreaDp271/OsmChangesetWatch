@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.andreadp271.osmwatch"
         minSdk = 26
         targetSdk = 35
-        versionCode = 103
-        versionName = "1.0.3"
+        versionCode = 104
+        versionName = "1.0.4"
         // aggiornamenti da GitHub dentro l'app; F-Droid aggiorna da sé: lì si compila con
         // -PnoUpdater
         buildConfigField("boolean", "UPDATER", (!project.hasProperty("noUpdater")).toString())

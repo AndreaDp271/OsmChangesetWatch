@@ -1,0 +1,1 @@
+Impostazioni: il gruppo Permessi mostra se notifiche, ottimizzazione batteria e attività in background sono a posto, e apre la pagina di sistema per sistemarli.
